@@ -23,7 +23,9 @@ it has already done and always picks up where it left off.
 ## Files included / required
 
 ```
-pipeline.py               entry point
+pipeline.py               entry point — fetch and process in one run
+fetch.py                  entry point — database collection only
+process.py                entry point — processing only (no database access)
 pipelib/                  all pipeline logic (config, db, stages, llm client, reports)
 prompt_notes.txt          Stage A prompt (note-usefulness classification)
 prompt_extract.txt        Stage B prompt (verbatim root-cause extraction)
@@ -75,6 +77,33 @@ python pipeline.py --stats               # print current ledger/case/growth tota
 
 Each run only ever touches dispatches it hasn't seen before — dispatch #1 through #6,009 will
 never be re-selected or reprocessed.
+
+### Running the two halves as separate commands
+
+The same work can be split into a collection step and a processing step:
+
+```
+python fetch.py --count 3000             # step 1: database only — stage the batch and stop
+python process.py                        # step 2: process the staged batch (no database access)
+
+python fetch.py --count 5 --dry-run      # preview what would be fetched, writes nothing
+python process.py --stats                # ledger/case/growth totals, no processing
+```
+
+`fetch.py` is the **only** command that opens a database connection. It selects the dispatches,
+pulls their notes, writes the work order to `state/batch_current.json`, and exits — no AI calls
+are made and nothing is marked processed, so a staged batch that never gets processed simply
+leaves those dispatches staged and still eligible.
+
+`process.py` picks that file up and needs only the LLM gateway, so the two steps can run on
+different schedules, or on different machines, as long as they share the same `state/` folder.
+Both are safe to re-run: `fetch.py` will not stage a second batch while one is already in
+flight (it reports the existing one instead), and re-running `process.py` after an interruption
+resumes from the last checkpoint.
+
+`python pipeline.py --count 3000` remains exactly equivalent to running the two in sequence —
+all three commands share the same code (`pipelib/runner.py`), so there is no behavioural
+difference between them.
 
 ### A known operational note: keep concurrency at 1
 

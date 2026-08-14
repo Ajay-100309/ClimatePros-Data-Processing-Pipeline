@@ -13,7 +13,8 @@ def stage_batch(count, dry_run=False):
     existing = load_json(config.BATCH_FILE)
     if existing is not None:
         print(f"Staged batch {existing['batch_id']} already exists "
-              f"({len(existing['dispatches'])} dispatches) — resuming it.")
+              f"({len(existing['dispatches'])} dispatches) — using it; "
+              "nothing new fetched.")
         if existing["count_requested"] != count:
             print(f"  (note: it was staged with --count {existing['count_requested']}, "
                   f"current --count {count} ignored)")
