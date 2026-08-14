@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Dispatch Pipeline Architecture</title>
+<style>
+  :root {
+    --surface: #fcfcfb; --card: #ffffff; --ink: #14140f; --secondary: #52514e;
+    --muted: #78766f; --grid: #dedcd3; --line: #23221c;
+    --accent-new: #a8480a; --accent-dup: #1a56b0;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--surface); color: var(--ink);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 1.6rem; margin-bottom: 4px; }
+  .subtitle { color: var(--secondary); margin-top: 0; margin-bottom: 32px; font-size: 1.02rem; }
+  h2 { font-size: 1.15rem; border-bottom: 1px solid var(--grid); padding-bottom: 8px; margin-top: 52px; }
+  figure { margin: 22px 0 8px; padding: 24px; background: var(--card); border: 1px solid var(--grid); border-radius: 12px; }
+  figure svg { width: 100%; height: auto; display: block; color: var(--line); }
+  figcaption { color: var(--secondary); font-size: 0.92rem; margin-top: 16px; padding: 0 4px; }
+  .legend { display: flex; gap: 26px; flex-wrap: wrap; font-size: 0.92rem; color: var(--secondary); margin: 8px 0 30px; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .swatch { width: 13px; height: 13px; border-radius: 3px; display: inline-block; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 6px; font-size: 0.96rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid); }
+  th { color: var(--secondary); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 0.92em; background: var(--surface); border: 1px solid var(--grid); padding: 1px 6px; border-radius: 4px; }
+  .muted { color: var(--secondary); font-size: 0.96rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Dispatch Case-Mapping Pipeline</h1>
+  <p class="subtitle">How raw service dispatches become a deduplicated catalog of unique root-cause cases.</p>
+
+  <h2>1. End-to-end flow</h2>
+
+  <figure>
+    <svg viewBox="0 0 1150 640" role="img" aria-label="A dispatch flows from the SQL database into fetch-and-exclude, down into a three-stage processing engine that classifies notes, extracts the root cause, and matches or creates a case, then out to the outputs.">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+        </marker>
+      </defs>
+
+      <!-- ===== top row: 3 boxes ===== -->
+      <!-- SQL Server -->
+      <rect x="40" y="40" width="230" height="120" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="155" y="83" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">SQL Server</text>
+      <text x="155" y="108" text-anchor="middle" font-size="14" fill="var(--secondary)">FieldJetXStg</text>
+      <text x="155" y="130" text-anchor="middle" font-size="13" fill="var(--muted)">dispatches + notes</text>
+
+      <line x1="270" y1="100" x2="332" y2="100" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="301" y="88" text-anchor="middle" font-size="13" fill="var(--secondary)">newest first</text>
+
+      <!-- Fetch & Exclude -->
+      <rect x="334" y="40" width="270" height="120" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="469" y="78" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">Fetch &amp; Exclude</text>
+      <text x="469" y="102" text-anchor="middle" font-size="14" fill="var(--secondary)">skip IDs already in</text>
+      <text x="469" y="122" text-anchor="middle" font-size="14" fill="var(--secondary)">ledger + case registry</text>
+      <text x="469" y="145" text-anchor="middle" font-size="13" fill="var(--muted)">→ staged batch file</text>
+
+      <!-- Outputs (top-right, closes the loop) -->
+      <rect x="860" y="40" width="250" height="120" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="985" y="83" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">Outputs</text>
+      <text x="985" y="108" text-anchor="middle" font-size="14" fill="var(--secondary)">case DB · ledger</text>
+      <text x="985" y="130" text-anchor="middle" font-size="13" fill="var(--muted)">Excel + growth chart</text>
+
+      <!-- down arrow: Fetch & Exclude -> processing engine -->
+      <line x1="469" y1="160" x2="469" y2="222" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="469" y="196" text-anchor="middle" font-size="13" fill="var(--secondary)">per dispatch</text>
+
+      <!-- engine label -->
+      <text x="469" y="205" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="0.05em" fill="var(--muted)"></text>
+
+      <!-- ===== processing engine: 3 boxes in a triangular cycle ===== -->
+      <rect x="349" y="224" width="240" height="122" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="469" y="253" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.04em" fill="var(--secondary)">STAGE A</text>
+      <text x="469" y="278" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">Classify Notes</text>
+      <text x="469" y="301" text-anchor="middle" font-size="14" fill="var(--secondary)">useful vs. admin /</text>
+      <text x="469" y="321" text-anchor="middle" font-size="14" fill="var(--secondary)">scheduling text</text>
+
+      <rect x="70" y="440" width="250" height="122" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="195" y="469" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.04em" fill="var(--secondary)">STAGE B</text>
+      <text x="195" y="494" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">Extract Root Cause</text>
+      <text x="195" y="517" text-anchor="middle" font-size="14" fill="var(--secondary)">verbatim, 1-4</text>
+      <text x="195" y="537" text-anchor="middle" font-size="14" fill="var(--secondary)">sentences</text>
+
+      <rect x="630" y="440" width="270" height="122" rx="10" fill="none" stroke="var(--accent-dup)" stroke-width="2.6"/>
+      <text x="765" y="469" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.03em" fill="var(--accent-dup)">STAGE C — see §2</text>
+      <text x="765" y="494" text-anchor="middle" font-size="18.5" font-weight="700" fill="var(--ink)">Match or Create</text>
+      <text x="765" y="517" text-anchor="middle" font-size="14" fill="var(--secondary)">embedding search</text>
+      <text x="765" y="537" text-anchor="middle" font-size="14" fill="var(--secondary)">+ AI judge</text>
+
+      <!-- triangle arrows: A -> B -> C -> (exit up to Outputs) -->
+      <line x1="392" y1="346" x2="255" y2="434" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="288" y="400" text-anchor="middle" font-size="13" fill="var(--secondary)">useful notes only</text>
+
+      <line x1="320" y1="501" x2="624" y2="501" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="472" y="489" text-anchor="middle" font-size="13" fill="var(--secondary)">root-cause text</text>
+
+      <!-- exit arrow: Stage C -> up to Outputs -->
+      <line x1="880" y1="440" x2="972" y2="166" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="965" y="300" text-anchor="middle" font-size="13" fill="var(--secondary)" transform="rotate(-72 965 300)">case id assigned</text>
+
+      <!-- checkpoint callout -->
+      <rect x="330" y="580" width="490" height="50" rx="8" fill="var(--surface)" stroke="var(--grid)" stroke-width="1.2"/>
+      <text x="575" y="610" text-anchor="middle" font-size="13.5" fill="var(--secondary)">State saved to disk every 10 dispatches — safe to stop and resume at any point</text>
+    </svg>
+    <figcaption>Figure 1. Data enters top-left, is staged, then flows down into a three-stage processing engine — classify, extract, match — before exiting up to the outputs on the right. Every stage's full batch finishes before the next stage starts, and progress is checkpointed continuously so the pipeline can be interrupted and resumed without reprocessing or losing work.</figcaption>
+  </figure>
+
+  <h2>2. How Stage C actually decides: match or create?</h2>
+  <p class="muted">This is the mechanism that determines whether a dispatch is a duplicate of something already known, or introduces a genuinely new case.</p>
+
+  <figure>
+    <svg viewBox="0 0 960 540" role="img" aria-label="A new root cause is embedded and compared against existing cases; if no similar case exists, or the AI judge decides it is different, a new case is created; if the AI judge confirms a match, the dispatch links to that existing case as a duplicate.">
+      <defs>
+        <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--line)"/>
+        </marker>
+      </defs>
+
+      <!-- start -->
+      <rect x="320" y="14" width="320" height="68" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="480" y="44" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">New root-cause text</text>
+      <text x="480" y="65" text-anchor="middle" font-size="13.5" fill="var(--secondary)">from Stage B</text>
+
+      <line x1="480" y1="82" x2="480" y2="120" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow2)"/>
+
+      <!-- embed + search -->
+      <rect x="240" y="122" width="480" height="82" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="480" y="154" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">Embed + search case database</text>
+      <text x="480" y="176" text-anchor="middle" font-size="13.5" fill="var(--secondary)">top 5 nearest cases, similarity ≥ 60%</text>
+      <text x="480" y="195" text-anchor="middle" font-size="13" fill="var(--muted)">cosine similarity — mechanical, no AI here</text>
+
+      <!-- branch: no candidates (left) -->
+      <line x1="320" y1="204" x2="165" y2="258" stroke="var(--line)" stroke-width="1.8"/>
+      <line x1="165" y1="258" x2="165" y2="298" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow2)"/>
+      <text x="165" y="238" text-anchor="middle" font-size="13.5" fill="var(--secondary)">no candidates</text>
+      <text x="165" y="255" text-anchor="middle" font-size="13.5" fill="var(--secondary)">above threshold</text>
+
+      <!-- branch: candidates found (right) -->
+      <line x1="640" y1="204" x2="795" y2="258" stroke="var(--line)" stroke-width="1.8"/>
+      <line x1="795" y1="258" x2="795" y2="298" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow2)"/>
+      <text x="795" y="238" text-anchor="middle" font-size="13.5" fill="var(--secondary)">candidate(s)</text>
+      <text x="795" y="255" text-anchor="middle" font-size="13.5" fill="var(--secondary)">found</text>
+
+      <!-- AI judge box -->
+      <rect x="640" y="300" width="310" height="82" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="795" y="330" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">AI judge compares text</text>
+      <text x="795" y="352" text-anchor="middle" font-size="13.5" fill="var(--secondary)">same component + same failure mode?</text>
+      <text x="795" y="371" text-anchor="middle" font-size="13" fill="var(--muted)">uncertain → defaults to "different"</text>
+
+      <!-- judge branches -->
+      <line x1="695" y1="382" x2="525" y2="440" stroke="var(--line)" stroke-width="1.8"/>
+      <line x1="525" y1="440" x2="525" y2="472" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow2)"/>
+      <text x="610" y="422" text-anchor="middle" font-size="13.5" fill="var(--secondary)">no / uncertain</text>
+
+      <line x1="875" y1="382" x2="875" y2="472" stroke="var(--accent-dup)" stroke-width="2.4" marker-end="url(#arrow2)"/>
+      <text x="915" y="425" text-anchor="middle" font-size="13.5" fill="var(--accent-dup)" font-weight="700">yes, same</text>
+
+      <!-- new case box (receives from both no-candidates and judge-no) -->
+      <line x1="165" y1="298" x2="165" y2="472" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow2)"/>
+      <rect x="55" y="474" width="490" height="66" rx="10" fill="none" stroke="var(--accent-new)" stroke-width="2.6"/>
+      <text x="300" y="503" text-anchor="middle" font-size="17.5" font-weight="700" fill="var(--accent-new)">Create new case</text>
+      <text x="300" y="525" text-anchor="middle" font-size="13.5" fill="var(--secondary)">new CASE-XXXX id, added to vector DB</text>
+
+      <!-- duplicate box -->
+      <rect x="720" y="474" width="230" height="66" rx="10" fill="none" stroke="var(--accent-dup)" stroke-width="2.6"/>
+      <text x="835" y="503" text-anchor="middle" font-size="17.5" font-weight="700" fill="var(--accent-dup)">Link to existing case</text>
+      <text x="835" y="525" text-anchor="middle" font-size="13.5" fill="var(--secondary)">counted as a duplicate</text>
+    </svg>
+    <figcaption>Figure 2. Similarity search is mechanical and only narrows the field; the actual same-or-different decision is made by an AI judge, which is deliberately biased toward creating a new case whenever it isn't confident — a false new case is considered safer than an incorrectly merged one.</figcaption>
+  </figure>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:var(--accent-new)"></span>outcome: new case created</span>
+    <span><span class="swatch" style="background:var(--accent-dup)"></span>outcome: matched as duplicate</span>
+  </div>
+
+  <h2>3. Key thresholds</h2>
+  <table>
+    <thead><tr><th>Setting</th><th>Value</th><th>What it controls</th></tr></thead>
+    <tbody>
+      <tr><td><code>N_CANDIDATES</code></td><td>5</td><td>how many similar cases get shown to the AI judge</td></tr>
+      <tr><td><code>SIM_FLOOR</code></td><td>60%</td><td>minimum similarity before a case is even considered a candidate</td></tr>
+      <tr><td><code>NOTE_CHUNK</code></td><td>20</td><td>notes per AI call in Stage A/B, to avoid oversized prompts</td></tr>
+      <tr><td><code>MAX_WORKERS</code></td><td>1</td><td>dispatches processed concurrently (kept low — see deployment notes)</td></tr>
+      <tr><td><code>CHECKPOINT_EVERY</code></td><td>10</td><td>dispatches between progress saves to disk</td></tr>
+    </tbody>
+  </table>
+
+</div>
+</body>
+</html>

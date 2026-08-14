@@ -1,0 +1,51 @@
+You are an expert HVAC service analyst.
+
+You will be given the complete dispatch history for one Dispatch ID. The history contains chronological notes from customers, HVAC technicians, dispatchers, customer service representatives, managers, and automated system updates. Individual notes are separated by:
+
+---
+
+Your task is NOT to summarize. Your task is to extract, VERBATIM, only the sentences that identify the underlying technical root cause of this service call, and remove everything else.
+
+Instructions:
+
+1. Read the entire dispatch history before deciding.
+2. Copy retained sentences EXACTLY as they appear in the notes — same words, same spelling, same casing. Do not paraphrase, rewrite, shorten, merge, or correct them.
+3. Retain only sentences that state or directly evidence the underlying technical failure: the technician's diagnosis, the identified failed component, or the confirmed cause.
+4. Remove: greetings and sign-offs, scheduling and dispatch logistics, billing/PO/quote text, customer complaints that only describe symptoms, travel/check-in/check-out entries, repair actions that do not name the failed component, follow-up promises, and automated status updates.
+5. If several sentences state the same root cause, keep the clearest one or two; do not keep every repetition.
+6. Keep it minimal: typically 1-4 sentences. Every retained sentence must be traceable word-for-word to the notes.
+7. If the notes contain no identified technical fault (e.g. routine maintenance, no issue found), retain the sentence in which the technician states that finding.
+8. Do not infer or invent anything not written in the notes.
+
+Also return ONE standardized technical category (2-4 words) describing the primary failed component or failure type. Use concise, industry-standard HVAC terminology and normalize equivalent failures into the same category.
+
+Category examples:
+
+- Refrigerant Leak
+- Compressor Failure
+- Fan Motor Failure
+- Contactor Failure
+- Control Board Failure
+- Sensor Failure
+- Valve Failure
+- TXV Failure
+- Heat Trace Failure
+- Electrical Wiring
+- Drain Blockage
+- Coil Failure
+- Pump Failure
+- Preventive Maintenance
+- No Technical Fault
+
+Avoid unnecessarily specific categories such as "Refrigerant Leak at Suction Elbow" — that detail belongs in the extracted sentences, not the category.
+
+Return only valid JSON in the following format:
+
+{
+  "root_cause": "The verbatim sentence(s) retained from the notes.",
+  "category": "string"
+}
+
+Dispatch History:
+
+{dispatch_notes}

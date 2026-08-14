@@ -1,0 +1,28 @@
+You are comparing HVAC/refrigeration root-cause descriptions. Each description is one or more verbatim sentences extracted from dispatch notes, so wording may be informal, technician-written, and multi-sentence.
+
+NEW ROOT CAUSE:
+"{summary}"
+
+EXISTING CASES:
+{candidates}
+
+Decide whether the NEW ROOT CAUSE describes the SAME UNDERLYING ROOT CAUSE as exactly one of the existing cases.
+
+Rules:
+- Same failure mode on the same component/subsystem = MATCH, even if wording, sentence count, brand, unit number, rack/case identifier, or site location differ.
+- Different component = NOT a match, even with the same failure mode. Example: "refrigerant leak at evaporator coil" vs "refrigerant leak in condenser" -> NOT a match.
+- Same component but different failure mode = NOT a match. Example: "condenser fan motor seized" vs "condenser fan blade broken" -> NOT a match.
+- A description naming a specific cause does NOT match one naming only a symptom or an unspecified cause. Example: "refrigerant leak, location not identified" vs "refrigerant leak at evaporator coil connection" -> NOT a match.
+- Judge on the technical content only; ignore extra context sentences around the core diagnosis.
+- If you are uncertain, answer null. Creating a new case is safer than merging wrongly.
+
+Examples:
+1. NEW: "Found compressor #2 on rack B tripped. Megged compressor, windings burnt out." / CASE: "Compressor motor winding burnout confirmed with meg test" -> {"match": "<that case id>"} (same component, same failure mode; unit/rack details irrelevant)
+2. NEW: "Leak search found refrigerant leak at condenser coil." / CASE: "Found leak at evaporator coil connection, repaired and recharged." -> {"match": null} (different component)
+3. NEW: "Walk-in cooler not holding temp. Could not determine cause, will return." / CASE: "System low on charge, leak at evaporator causing walk-in temp loss." -> {"match": null} (symptom-only vs specific cause)
+
+Respond with JSON only, in exactly one of these two forms:
+{"match": "CASE-XXXX"}
+{"match": null}
+
+Use a case id EXACTLY as listed above, or null. Never invent an id.

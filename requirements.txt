@@ -1,0 +1,8 @@
+openai
+pandas
+openpyxl
+python-dotenv
+chromadb>=1.0,<2
+numpy
+matplotlib
+pymssql==2.3.13
