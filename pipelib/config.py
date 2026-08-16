@@ -49,7 +49,7 @@ EMBED_TRUNCATE = 4000
 N_CANDIDATES = 5
 SIM_FLOOR = 0.60
 NOTE_CHUNK = 20
-MAX_WORKERS = 1
+MAX_WORKERS = 8
 CHECKPOINT_EVERY = 10
 
 # DB snapshot goes quiet after early June 2026; the proven sample cutoff
