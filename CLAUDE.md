@@ -20,6 +20,10 @@ venv/bin/python pipeline.py --stats             # ledger / case / growth totals,
 
 venv/bin/python fetch.py --count 3000           # DB collection only — stage the batch and stop
 venv/bin/python process.py                      # process the staged batch — no DB access
+
+venv/bin/python reset_state.py --dry-run        # preview a cold start; changes nothing
+venv/bin/python reset_state.py --yes            # wipe progress, seed an empty catalog
+venv/bin/python make_report.py                  # regenerate output/pipeline_report.html
 pip install -r requirements.txt                 # Python 3.12; venv/ is present but gitignored
 ```
 
@@ -39,7 +43,8 @@ A real run needs both live dependencies: the Tailscale LLM gateway (chat + `nomi
 - Never `git checkout` / `reset --hard` / `stash` these paths casually — that rewinds case identity. Deleting them permanently resets `CASE-XXXX` numbering.
 - `state/casemap.json` and `output/chroma_cases_extracted/` must stay in sync; `stage_casemap.reconcile()` repairs drift (deletes orphan vectors, restores missing ones from the embedding cache) and then **asserts** `chroma.count() == len(registry)`.
 - **Casemap fingerprint guard**: `state/casemap.json` stores a fingerprint of `MODEL`, `EMBED_MODEL`, `EMBED_PREFIX`, `SIM_FLOOR`, `N_CANDIDATES`, and `sha256(prompt_casemap.txt)`. Changing any of them makes Stage C refuse to run against the existing case DB. This is deliberate — restore the previous config, or start a fresh case DB.
-- The state error messages tell you to "run `migrate_casemap_state.py` first" — **that script is not in this repo** (it belongs to the original project folder and has already run). If those files are missing here, they need restoring from a backup, not regenerating.
+- The state error messages tell you to "run `migrate_casemap_state.py` first" — **that script is not in this repo** (it belonged to the original project folder). `ledger.load()` and `stage_casemap.load_state()` both `SystemExit` when their file is missing, so deleting state files does *not* give a working cold start. `reset_state.py` is the supported path: it clears progress and writes the two seed files those loaders require (`{"dispatches": {}}` and a v2 casemap with a config-derived fingerprint, `next_case_num: 1`). To recover an existing catalog instead, restore from git or a backup.
+- Because `state/` is committed, **a fresh clone inherits all processed dispatches** and continues from the next unseen one. Starting over is always explicit.
 - `.env` is gitignored but present, with 8 required keys: `API_KEY`/`BASE_URL`/`MODEL` (LLM gateway) and `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD` (FieldJetXStg). Config validation reports missing key *names* only, never values — keep it that way.
 
 ## Architecture

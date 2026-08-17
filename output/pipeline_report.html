@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dispatch Case-Mapping — Data Report</title>
+<style>
+  :root {
+    --surface: #fcfcfb; --card: #ffffff; --ink: #14140f; --secondary: #52514e;
+    --muted: #78766f; --grid: #dedcd3; --match: #1a56b0; --new: #a8480a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.55; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 90px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--secondary); margin: 0 0 8px; font-size: 1.03rem; }
+  .stamp { color: var(--muted); font-size: 0.85rem; margin: 0 0 34px; }
+  h2 { font-size: 1.16rem; border-bottom: 1px solid var(--grid); padding-bottom: 8px;
+       margin-top: 56px; }
+  h3 { font-size: 1rem; margin: 30px 0 6px; }
+  p { margin: 12px 0; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+           gap: 14px; margin: 26px 0 8px; }
+  .kpi { background: var(--card); border: 1px solid var(--grid); border-radius: 12px;
+          padding: 18px 20px; }
+  .kpi .v { font-size: 2.05rem; font-weight: 650; letter-spacing: -0.02em; line-height: 1.1; }
+  .kpi .k { color: var(--secondary); font-size: 0.84rem; text-transform: uppercase;
+             letter-spacing: 0.04em; margin-bottom: 7px; }
+  .kpi .n { color: var(--muted); font-size: 0.85rem; margin-top: 5px; }
+  figure { margin: 22px 0 8px; padding: 24px; background: var(--card);
+            border: 1px solid var(--grid); border-radius: 12px; overflow-x: auto; }
+  figure svg { width: 100%; min-width: 640px; height: auto; display: block; }
+  figcaption { color: var(--secondary); font-size: 0.92rem; margin-top: 16px; padding: 0 2px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0 6px; font-size: 0.94rem; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--grid);
+            vertical-align: top; }
+  th { color: var(--secondary); font-weight: 600; font-size: 0.78rem;
+        text-transform: uppercase; letter-spacing: 0.03em; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.q { color: var(--secondary); font-size: 0.89rem; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.88em;
+          background: var(--surface); border: 1px solid var(--grid); padding: 1px 5px;
+          border-radius: 4px; white-space: nowrap; }
+  .callout { background: var(--card); border: 1px solid var(--grid);
+              border-left: 3px solid var(--new); border-radius: 10px;
+              padding: 16px 20px; margin: 20px 0; }
+  .callout h3 { margin-top: 0; }
+  .legend { display: flex; gap: 22px; flex-wrap: wrap; font-size: 0.9rem;
+             color: var(--secondary); margin: 14px 0 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 8px; }
+  .sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .tw { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Dispatch Case-Mapping — Data Report</h1>
+  <p class="subtitle">What 16,000 processed dispatches reveal about the shape of
+     ClimatePros' root-cause catalog.</p>
+  <p class="stamp">Generated 17 August 2026 from <code>state/</code> · covers every batch to date</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="k">Dispatches processed</div><div class="v">16,000</div>
+      <div class="n">1.03% of 1,551,773 eligible</div></div>
+    <div class="kpi"><div class="k">Unique cases</div><div class="v">1,808</div>
+      <div class="n">from 13,284 resolved dispatches</div></div>
+    <div class="kpi"><div class="k">Deduplication</div><div class="v">7.3&times;</div>
+      <div class="n">dispatches per case on average</div></div>
+    <div class="kpi"><div class="k">New-case rate</div><div class="v">10.6%</div>
+      <div class="n">trailing 3,000 dispatches, from 26.8%</div></div>
+  </div>
+
+  <h2>1. The catalog is deduplicating well — and still growing</h2>
+
+  <figure>
+    <svg viewBox="0 0 1100 430" role="img" aria-label="Unique cases against dispatches processed. The curve bends well below the one-case-per-dispatch diagonal, ending at 1,808 cases for 13,284 dispatches."><line x1="66" y1="384.0" x2="1070" y2="384.0" stroke="#dedcd3" stroke-width="1"/><text x="56" y="388.0" text-anchor="end" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">0</text><line x1="66" y1="295.5" x2="1070" y2="295.5" stroke="#dedcd3" stroke-width="1"/><text x="56" y="299.5" text-anchor="end" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">500</text><line x1="66" y1="207.0" x2="1070" y2="207.0" stroke="#dedcd3" stroke-width="1"/><text x="56" y="211.0" text-anchor="end" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">1,000</text><line x1="66" y1="118.5" x2="1070" y2="118.5" stroke="#dedcd3" stroke-width="1"/><text x="56" y="122.5" text-anchor="end" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">1,500</text><line x1="66" y1="30.0" x2="1070" y2="30.0" stroke="#dedcd3" stroke-width="1"/><text x="56" y="34.0" text-anchor="end" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">2,000</text><text x="66.0" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">0</text><text x="233.3" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">2,500</text><text x="400.7" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">5,000</text><text x="568.0" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">7,500</text><text x="735.3" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">10,000</text><text x="902.7" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">12,500</text><text x="1070.0" y="406" text-anchor="middle" font-size="12" fill="#78766f" style="font-variant-numeric:tabular-nums">15,000</text><line x1="66.0" y1="384.0" x2="199.9" y2="30.0" stroke="#c3c2b7" stroke-width="1" stroke-dasharray="5 5"/><text x="149.0" y="156.5" font-size="12" fill="#78766f" transform="rotate(-69.3 149.0 156.5)">1 new case per dispatch</text><polyline points="66.1,383.8 68.1,379.8 70.3,377.5 72.4,375.0 74.5,373.2 76.6,370.9 78.8,369.1 80.9,367.4 83.0,364.9 85.1,362.1 87.3,360.5 89.4,359.0 91.5,357.1 93.6,356.9 95.7,356.0 97.9,354.3 100.0,353.2 102.1,352.3 104.2,351.1 106.4,349.8 108.5,348.8 110.6,347.9 112.7,346.5 114.9,345.1 116.9,344.5 119.1,343.3 121.2,342.6 123.3,341.3 125.4,340.3 127.6,339.2 129.7,338.7 131.8,337.1 133.9,336.2 136.1,335.9 138.2,334.8 140.3,334.1 142.4,332.7 144.5,331.4 146.7,330.7 148.8,330.4 150.9,329.7 153.0,328.6 155.2,327.2 157.3,326.5 159.4,325.2 161.5,324.7 163.7,323.8 165.7,322.2 167.9,321.0 170.0,320.1 172.2,318.5 174.2,317.4 176.4,315.7 178.5,314.6 180.6,313.2 182.7,312.1 184.9,311.6 186.9,311.3 189.1,310.5 191.2,310.2 193.4,309.0 195.4,308.4 197.6,307.7 199.7,306.7 201.8,306.1 203.9,304.7 206.1,303.6 208.2,302.8 210.3,302.2 212.5,300.8 214.6,299.9 216.7,299.0 218.8,297.8 221.0,296.7 223.0,296.0 225.2,294.6 227.3,293.7 229.5,293.4 231.5,291.8 233.7,291.1 235.8,289.8 237.9,288.4 240.0,287.5 242.2,286.5 244.2,285.8 246.4,285.1 248.5,284.7 250.7,284.2 252.7,283.3 254.9,282.9 257.0,282.0 259.1,281.7 261.2,280.3 263.4,279.4 265.5,279.0 267.6,278.0 269.7,277.4 271.9,276.7 274.0,276.4 276.1,276.0 278.2,275.0 280.3,274.3 282.5,273.9 284.6,273.0 286.7,271.6 288.8,270.9 291.0,269.7 293.1,268.8 295.2,267.7 297.3,267.5 299.5,267.2 301.5,265.6 303.7,264.2 305.8,263.1 307.9,262.6 310.0,261.9 312.2,260.6 314.3,259.9 316.4,259.0 318.5,257.3 320.7,256.4 322.8,256.2 324.9,255.0 327.0,254.1 329.2,253.6 331.3,253.4 333.4,252.0 335.5,251.4 337.6,250.5 339.8,250.0 341.9,249.3 344.0,248.4 346.1,248.1 348.3,247.0 350.4,246.8 352.5,246.6 354.6,246.3 356.8,245.1 358.8,244.9 361.0,244.5 363.1,243.6 365.2,242.4 367.3,241.7 369.5,240.8 371.6,239.9 373.7,239.2 375.8,238.5 378.0,237.6 380.1,236.9 382.2,236.4 384.3,235.9 386.4,235.0 388.6,234.3 390.7,233.6 392.8,232.8 394.9,232.0 397.1,231.1 399.2,229.8 401.3,229.1 403.4,228.6 405.6,227.7 407.6,227.2 409.8,226.3 411.9,225.9 414.1,225.4 416.1,224.9 418.3,223.8 420.4,223.6 422.5,222.8 424.6,222.4 426.8,221.5 428.8,220.8 431.0,220.3 433.1,219.6 435.3,218.7 437.3,218.7 439.5,218.0 441.6,217.3 443.7,216.4 445.8,215.5 448.0,215.0 450.1,213.9 452.2,213.5 454.3,213.0 456.5,212.7 458.6,212.0 460.7,210.7 462.8,210.4 464.9,209.5 467.1,208.8 469.2,208.6 471.3,207.9 473.4,207.0 475.6,206.6 477.7,206.5 479.8,205.9 481.9,205.6 484.1,205.2 486.1,204.3 488.3,203.6 490.4,202.6 492.6,202.4 494.6,201.3 496.8,200.1 498.9,199.0 501.0,198.2 503.1,197.4 505.3,196.9 507.4,195.1 509.5,193.7 511.6,192.8 513.8,192.3 515.9,192.1 518.0,191.1 520.1,190.5 522.2,189.3 524.4,188.1 526.5,187.5 528.6,186.8 530.7,185.8 532.9,185.2 535.0,184.5 537.1,183.8 539.2,183.1 541.4,182.6 543.4,182.2 545.6,181.7 547.7,180.8 549.8,180.5 551.9,179.7 554.1,178.9 556.2,178.0 558.3,177.1 560.4,176.6 562.6,176.0 564.7,175.7 566.8,175.3 568.9,174.6 571.0,174.1 573.2,173.7 575.3,173.0 577.4,172.5 579.5,172.0 581.7,171.6 583.8,170.7 585.9,170.5 588.0,169.7 590.2,169.1 592.3,168.2 594.4,167.7 596.5,167.5 598.7,167.0 600.7,166.6 602.9,166.1 605.0,164.9 607.1,164.2 609.2,163.8 611.4,162.9 613.5,162.8 615.6,162.6 617.7,162.0 619.9,161.7 621.9,161.2 624.1,160.1 626.2,159.2 628.3,158.3 630.4,157.4 632.6,156.0 634.7,155.3 636.8,154.8 638.9,153.9 641.1,153.2 643.2,152.1 645.3,151.2 647.4,151.1 649.5,150.4 651.7,149.5 653.8,149.3 656.0,148.9 658.0,148.4 660.2,148.1 662.3,147.4 664.4,146.8 666.5,146.5 668.7,146.1 670.7,145.4 672.9,145.0 675.0,144.2 677.2,143.5 679.2,143.3 681.4,142.7 683.5,142.2 685.6,141.7 687.7,141.2 689.9,140.4 692.0,140.3 694.1,139.2 696.2,138.3 698.4,138.0 700.5,137.6 702.6,137.4 704.7,136.7 706.8,136.4 709.0,135.7 711.1,134.6 713.2,133.2 715.3,132.5 717.5,131.4 719.6,131.1 721.7,130.5 723.8,130.0 726.0,129.1 728.0,128.6 730.2,127.5 732.3,127.2 734.5,126.6 736.5,126.1 738.7,125.8 740.8,125.2 742.9,124.5 745.0,123.6 747.2,123.3 749.3,122.4 751.4,121.9 753.5,120.4 755.7,119.6 757.8,119.2 759.9,118.7 762.0,117.8 764.1,117.3 766.3,116.4 768.4,116.0 770.5,115.7 772.6,115.3 774.8,115.0 776.9,114.6 779.0,114.3 781.1,113.9 783.3,112.8 785.3,112.5 787.5,112.1 789.6,111.6 791.7,111.4 793.8,110.9 796.0,109.8 798.1,109.8 800.2,109.5 802.3,108.9 804.5,108.1 806.6,107.0 808.7,105.9 810.8,105.6 812.9,105.0 815.1,104.3 817.2,104.2 819.3,104.2 821.4,103.5 823.6,102.9 825.7,102.4 827.8,101.9 829.9,101.3 832.1,100.3 834.2,99.4 836.3,98.5 838.4,98.3 840.6,97.8 842.6,97.1 844.8,96.0 846.9,95.3 849.0,95.0 851.1,94.4 853.3,94.4 855.4,93.4 857.5,92.8 859.6,92.3 861.8,91.2 863.8,90.7 866.0,90.0 868.1,89.5 870.2,89.1 872.3,88.8 874.5,88.1 876.6,87.3 878.7,86.8 880.8,86.5 883.0,85.8 885.1,85.2 887.2,84.2 889.3,83.5 891.4,82.6 893.6,81.3 895.7,80.8 897.8,80.1 899.9,79.6 902.1,79.0 904.2,78.7 906.3,77.6 908.4,77.1 910.6,76.9 912.6,76.6 914.8,76.0 916.9,75.3 919.1,75.1 921.1,74.2 923.3,73.9 925.4,73.0 927.5,72.5 929.6,71.4 931.8,70.9 933.9,70.7 936.0,69.6 938.1,68.9 940.3,68.4 942.4,67.7 944.5,67.2 946.6,66.3 948.7,65.6 950.9,65.4 953.0,64.9 955.1,64.0" fill="none" stroke="#1a56b0" stroke-width="2" stroke-linejoin="round"/><circle cx="955.1" cy="64.0" r="4.5" fill="#1a56b0" stroke="#ffffff" stroke-width="2"/><text x="943.1" y="52.0" text-anchor="end" font-size="13" font-weight="600" fill="#14140f">1,808 cases</text><line x1="66" y1="384.0" x2="1070" y2="384.0" stroke="#c3c2b7" stroke-width="1"/><text x="568" y="426" text-anchor="middle" font-size="12" fill="#78766f">Dispatches with a resolved root cause</text></svg>
+    <figcaption>Every resolved dispatch adds a point. The dashed diagonal is what the curve
+      would look like if no two dispatches ever shared a root cause. The gap between the two
+      is the deduplication the pipeline is buying: 13,284 dispatches collapsed
+      into 1,808 distinct cases.</figcaption>
+  </figure>
+
+  <h2>2. But the new-case rate has flattened, not fallen to zero</h2>
+
+  <figure>
+    <svg viewBox="0 0 1100 320" role="img" aria-label="New-case rate per 1,000 dispatches, falling from 27 percent in the first block to about 11 percent, then holding roughly flat."><line x1="62" y1="260.0" x2="1072" y2="260.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="264.0" text-anchor="end" font-size="12" fill="#78766f">0%</text><line x1="62" y1="220.0" x2="1072" y2="220.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="224.0" text-anchor="end" font-size="12" fill="#78766f">5%</text><line x1="62" y1="180.0" x2="1072" y2="180.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="184.0" text-anchor="end" font-size="12" fill="#78766f">10%</text><line x1="62" y1="140.0" x2="1072" y2="140.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="144.0" text-anchor="end" font-size="12" fill="#78766f">15%</text><line x1="62" y1="100.0" x2="1072" y2="100.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="104.0" text-anchor="end" font-size="12" fill="#78766f">20%</text><line x1="62" y1="60.0" x2="1072" y2="60.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="64.0" text-anchor="end" font-size="12" fill="#78766f">25%</text><line x1="62" y1="20.0" x2="1072" y2="20.0" stroke="#dedcd3" stroke-width="1"/><text x="52" y="24.0" text-anchor="end" font-size="12" fill="#78766f">30%</text><rect x="65.0" y="45.6" width="66.1" height="214.4" rx="4" fill="#78766f"><title>0–1,000: 268 new cases (26.8%)</title></rect><text x="98.1" y="38.6" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">26.8%</text><text x="98.1" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">1k</text><rect x="137.1" y="124.8" width="66.1" height="135.2" rx="4" fill="#a8480a"><title>1,000–2,000: 169 new cases (16.9%)</title></rect><text x="170.2" y="117.8" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">16.9%</text><text x="170.2" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">2k</text><rect x="209.3" y="132.0" width="66.1" height="128.0" rx="4" fill="#a8480a"><title>2,000–3,000: 160 new cases (16.0%)</title></rect><text x="242.4" y="125.0" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">16.0%</text><text x="242.4" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">3k</text><rect x="281.4" y="140.0" width="66.1" height="120.0" rx="4" fill="#a8480a"><title>3,000–4,000: 150 new cases (15.0%)</title></rect><text x="314.5" y="133.0" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">15.0%</text><text x="314.5" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">4k</text><rect x="353.6" y="158.4" width="66.1" height="101.6" rx="4" fill="#a8480a"><title>4,000–5,000: 127 new cases (12.7%)</title></rect><text x="386.6" y="151.4" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">12.7%</text><text x="386.6" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">5k</text><rect x="425.7" y="167.2" width="66.1" height="92.8" rx="4" fill="#a8480a"><title>5,000–6,000: 116 new cases (11.6%)</title></rect><text x="458.8" y="160.2" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.6%</text><text x="458.8" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">6k</text><rect x="497.9" y="150.4" width="66.1" height="109.6" rx="4" fill="#a8480a"><title>6,000–7,000: 137 new cases (13.7%)</title></rect><text x="530.9" y="143.4" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">13.7%</text><text x="530.9" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">7k</text><rect x="570.0" y="179.2" width="66.1" height="80.8" rx="4" fill="#a8480a"><title>7,000–8,000: 101 new cases (10.1%)</title></rect><text x="603.1" y="172.2" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">10.1%</text><text x="603.1" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">8k</text><rect x="642.1" y="167.2" width="66.1" height="92.8" rx="4" fill="#a8480a"><title>8,000–9,000: 116 new cases (11.6%)</title></rect><text x="675.2" y="160.2" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.6%</text><text x="675.2" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">9k</text><rect x="714.3" y="169.6" width="66.1" height="90.4" rx="4" fill="#a8480a"><title>9,000–10,000: 113 new cases (11.3%)</title></rect><text x="747.4" y="162.6" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.3%</text><text x="747.4" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">10k</text><rect x="786.4" y="182.4" width="66.1" height="77.6" rx="4" fill="#a8480a"><title>10,000–11,000: 97 new cases (9.7%)</title></rect><text x="819.5" y="175.4" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">9.7%</text><text x="819.5" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">11k</text><rect x="858.6" y="172.0" width="66.1" height="88.0" rx="4" fill="#a8480a"><title>11,000–12,000: 110 new cases (11.0%)</title></rect><text x="891.6" y="165.0" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.0%</text><text x="891.6" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">12k</text><rect x="930.7" y="170.4" width="66.1" height="89.6" rx="4" fill="#a8480a"><title>12,000–13,000: 112 new cases (11.2%)</title></rect><text x="963.8" y="163.4" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.2%</text><text x="963.8" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">13k</text><rect x="1002.9" y="169.9" width="66.1" height="90.1" rx="4" fill="#a8480a"><title>13,000–13,284: 32 new cases (11.3%)</title></rect><text x="1035.9" y="162.9" text-anchor="middle" font-size="11.5" fill="#14140f" style="font-variant-numeric:tabular-nums">11.3%</text><text x="1035.9" y="280" text-anchor="middle" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">13.3k</text><line x1="62" y1="260.0" x2="1072" y2="260.0" stroke="#c3c2b7" stroke-width="1"/><text x="567" y="312" text-anchor="middle" font-size="12" fill="#78766f">Cumulative dispatches processed (blocks of 1,000)</text></svg>
+    <figcaption>New cases created per 1,000 resolved dispatches. The first block (muted) is a
+      cold-start artifact — with an empty catalog, nearly everything is new. After that the rate
+      fell steadily to about 10%, and has held there for the last several thousand dispatches
+      rather than continuing to decline.</figcaption>
+  </figure>
+
+  <div class="callout">
+    <h3>This is the report's main finding</h3>
+    <p>A catalog approaching saturation would show the new-case rate decaying toward zero.
+      This one decays and then <strong>plateaus around 11%</strong>. Roughly one in
+      9 dispatches still introduces a genuinely new root cause after
+      13,284 of them — so the catalog should be treated as <em>usefully
+      representative but not complete</em>. It is a working knowledge base, not a finished
+      taxonomy.</p>
+  </div>
+
+  <h2>3. What that implies at full corpus scale</h2>
+
+  <p>Case growth follows Heaps' law — <code>cases = K &times; dispatches<sup>β</sup></code>, the
+     standard model for how a vocabulary grows as a corpus expands. The fit is unusually tight:
+     <strong>β = 0.726</strong>, R² = 0.9995 across all 13,284 points.
+     A β below 1 is precisely why deduplication works, and it predicts how the catalog scales.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Dispatches processed</th><th>Projected cases (full fit)</th>
+      <th>Projected cases (recent regime)</th><th>Share of corpus</th></tr></thead>
+    <tbody><tr><td>25,000</td><td>2,813</td><td>2,883</td><td>1.6%</td></tr><tr><td>50,000</td><td>4,653</td><td>4,837</td><td>3.2%</td></tr><tr><td>100,000</td><td>7,696</td><td>8,115</td><td>6.4%</td></tr><tr><td>250,000</td><td>14,967</td><td>16,080</td><td>16.1%</td></tr><tr><td>500,000</td><td>24,756</td><td>26,975</td><td>32.2%</td></tr><tr><td>1,551,773</td><td>56,330</td><td>62,817</td><td>100.0%</td></tr></tbody>
+  </table></div>
+
+  <p class="stamp">Two fits are shown because the opening 1,000 dispatches distort the curve:
+     the "recent regime" fit uses only N ≥ 6,000. They agree closely, which is reassuring —
+     but the final row extrapolates roughly 100× beyond observed data, so treat it as an
+     order-of-magnitude estimate, not a forecast. The mid-range rows (25k–100k) are the
+     defensible ones.</p>
+
+  <h2>4. Where dispatches drop out</h2>
+
+  <figure>
+    <svg viewBox="0 0 1100 156" role="img" aria-label="Processing funnel from dispatches fetched down to dispatches naming a real technical fault."><text x="286" y="28" text-anchor="end" font-size="13" font-weight="600" fill="#14140f">Fetched &amp; processed</text><text x="286" y="44" text-anchor="end" font-size="11.5" fill="#78766f">selected from the staging database</text><rect x="300" y="16" width="650.0" height="26" rx="4" fill="#86b6ef"><title>Fetched &amp; processed: 16,000 (100.0% of fetched)</title></rect><text x="962.0" y="34" font-size="13" fill="#14140f" style="font-variant-numeric:tabular-nums">16,000</text><text x="962.0" y="48" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">100.0%</text><text x="286" y="74" text-anchor="end" font-size="13" font-weight="600" fill="#14140f">Mapped to a case</text><text x="286" y="90" text-anchor="end" font-size="11.5" fill="#78766f">2,716 had only admin or scheduling text</text><rect x="300" y="62" width="539.7" height="26" rx="4" fill="#3987e5"><title>Mapped to a case: 13,284 (83.0% of fetched)</title></rect><text x="851.7" y="80" font-size="13" fill="#14140f" style="font-variant-numeric:tabular-nums">13,284</text><text x="851.7" y="94" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">83.0%</text><text x="286" y="120" text-anchor="end" font-size="13" font-weight="600" fill="#14140f">Named a real technical fault</text><text x="286" y="136" text-anchor="end" font-size="11.5" fill="#78766f">1,656 concluded “no fault identified”</text><rect x="300" y="108" width="472.4" height="26" rx="4" fill="#256abf"><title>Named a real technical fault: 11,628 (72.7% of fetched)</title></rect><text x="784.4" y="126" font-size="13" fill="#14140f" style="font-variant-numeric:tabular-nums">11,628</text><text x="784.4" y="140" font-size="11" fill="#78766f" style="font-variant-numeric:tabular-nums">72.7%</text></svg>
+    <figcaption>Of 16,000 dispatches processed, 11,628
+      (72.7%) ended up describing an actual technical failure. The
+      two losses are different in kind: 2,716 dispatches had no usable notes at all,
+      while 1,656 were processed successfully but concluded that no fault was
+      found.</figcaption>
+  </figure>
+
+  <p>The note filter is doing most of the heavy lifting. Across
+     14,981 dispatches, <strong>127,381 individual notes</strong>
+     were classified and only <strong>30,933 (24.3%)</strong>
+     were judged technically useful — about 2.1 useful notes
+     per dispatch out of 8.5 written. Three of every four
+     notes are scheduling, dispatch, or billing chatter.</p>
+
+  <h2>5. How each dispatch gets assigned</h2>
+
+  <figure>
+    <svg viewBox="0 0 1100 108" role="img" aria-label="Of every resolved dispatch, 86.4 percent matched an existing case and 13.6 percent created a new one."><rect x="0.0" y="24" width="948.3" height="34" rx="4" fill="#1a56b0"><title>Matched to an existing case: 11,476 (86.4%)</title></rect><text x="2.0" y="14" text-anchor="start" font-size="13" font-weight="600" fill="#14140f">86.4%</text><text x="2.0" y="78" text-anchor="start" font-size="12.5" fill="#78766f">Matched to an existing case · 11,476</text><rect x="950.3" y="24" width="147.7" height="34" rx="4" fill="#a8480a"><title>Created a new case: 1,808 (13.6%)</title></rect><text x="1096.0" y="14" text-anchor="end" font-size="13" font-weight="600" fill="#14140f">13.6%</text><text x="1096.0" y="78" text-anchor="end" font-size="12.5" fill="#78766f">Created a new case · 1,808</text></svg>
+    <figcaption>86.4% of resolved dispatches matched a case that already
+      existed.</figcaption>
+    <div class="legend">
+      <span><i class="sw" style="background:#1a56b0"></i> Matched an existing case</span>
+      <span><i class="sw" style="background:#a8480a"></i> Created a new case</span>
+    </div>
+  </figure>
+
+  <div class="tw"><table>
+    <thead><tr><th>Match type</th><th>Dispatches</th><th>Share</th><th>What it means</th></tr></thead>
+    <tbody><tr><td><code>matched_llm</code></td><td class=num>10,718</td><td class=num>80.7%</td><td>Similarity search proposed candidates; the AI judge confirmed one</td></tr><tr><td><code>new_llm_rejected</code></td><td class=num>1,775</td><td class=num>13.4%</td><td>Candidates existed, but the judge rejected all of them — new case</td></tr><tr><td><code>matched_exact</code></td><td class=num>758</td><td class=num>5.7%</td><td>Byte-identical root-cause text already seen — cache hit, no AI call</td></tr><tr><td><code>new_no_candidates</code></td><td class=num>32</td><td class=num>0.2%</td><td>Nothing cleared the 0.60 similarity floor — new case</td></tr><tr><td><code>new_first</code></td><td class=num>1</td><td class=num>0.0%</td><td>The very first case in an empty catalog</td></tr></tbody>
+  </table></div>
+
+  <p>The exact-duplicate cache resolves 5.7% of
+     dispatches with no AI call at all — technicians writing byte-identical root causes. Only
+     32 dispatches
+     (0.24%) failed to surface any
+     candidate above the 0.60 similarity floor, which says the embedding retrieval is nearly
+     always finding something plausible — the AI judge, not the vector search, is what decides
+     new-versus-repeat.</p>
+
+  <h2>6. What actually breaks</h2>
+
+  <figure>
+    <svg viewBox="0 0 1100 438" role="img" aria-label="Ranked bar chart."><text x="238" y="23" text-anchor="end" font-size="13" fill="#14140f">Drain Blockage</text><rect x="250" y="11" width="705.0" height="16" rx="4" fill="#1a56b0"><title>Drain Blockage: 1,673 dispatches (12.6%)</title></rect><text x="965.0" y="24" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">1,673  ·  12.6%</text><text x="238" y="53" text-anchor="end" font-size="13" fill="#14140f">No Technical Fault</text><rect x="250" y="41" width="697.8" height="16" rx="4" fill="#1a56b0"><title>No Technical Fault: 1,656 dispatches (12.5%)</title></rect><text x="957.8" y="54" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">1,656  ·  12.5%</text><text x="238" y="83" text-anchor="end" font-size="13" fill="#14140f">Refrigerant Leak</text><rect x="250" y="71" width="514.1" height="16" rx="4" fill="#1a56b0"><title>Refrigerant Leak: 1,220 dispatches (9.2%)</title></rect><text x="774.1" y="84" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">1,220  ·  9.2%</text><text x="238" y="113" text-anchor="end" font-size="13" fill="#14140f">Fan Motor Failure</text><rect x="250" y="101" width="445.8" height="16" rx="4" fill="#1a56b0"><title>Fan Motor Failure: 1,058 dispatches (8.0%)</title></rect><text x="705.8" y="114" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">1,058  ·  8.0%</text><text x="238" y="143" text-anchor="end" font-size="13" fill="#14140f">Sensor Failure</text><rect x="250" y="131" width="303.0" height="16" rx="4" fill="#1a56b0"><title>Sensor Failure: 719 dispatches (5.4%)</title></rect><text x="563.0" y="144" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">719  ·  5.4%</text><text x="238" y="173" text-anchor="end" font-size="13" fill="#14140f">Control Board Failure</text><rect x="250" y="161" width="297.5" height="16" rx="4" fill="#1a56b0"><title>Control Board Failure: 706 dispatches (5.3%)</title></rect><text x="557.5" y="174" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">706  ·  5.3%</text><text x="238" y="203" text-anchor="end" font-size="13" fill="#14140f">Coil Failure</text><rect x="250" y="191" width="282.8" height="16" rx="4" fill="#1a56b0"><title>Coil Failure: 671 dispatches (5.1%)</title></rect><text x="542.8" y="204" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">671  ·  5.1%</text><text x="238" y="233" text-anchor="end" font-size="13" fill="#14140f">Compressor Failure</text><rect x="250" y="221" width="281.9" height="16" rx="4" fill="#1a56b0"><title>Compressor Failure: 669 dispatches (5.0%)</title></rect><text x="541.9" y="234" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">669  ·  5.0%</text><text x="238" y="263" text-anchor="end" font-size="13" fill="#14140f">Electrical Wiring</text><rect x="250" y="251" width="215.8" height="16" rx="4" fill="#1a56b0"><title>Electrical Wiring: 512 dispatches (3.9%)</title></rect><text x="475.8" y="264" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">512  ·  3.9%</text><text x="238" y="293" text-anchor="end" font-size="13" fill="#14140f">Contactor Failure</text><rect x="250" y="281" width="118.8" height="16" rx="4" fill="#1a56b0"><title>Contactor Failure: 282 dispatches (2.1%)</title></rect><text x="378.8" y="294" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">282  ·  2.1%</text><text x="238" y="323" text-anchor="end" font-size="13" fill="#14140f">TXV Failure</text><rect x="250" y="311" width="112.1" height="16" rx="4" fill="#1a56b0"><title>TXV Failure: 266 dispatches (2.0%)</title></rect><text x="372.1" y="324" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">266  ·  2.0%</text><text x="238" y="353" text-anchor="end" font-size="13" fill="#14140f">Condenser Fan Motor Failure</text><rect x="250" y="341" width="106.2" height="16" rx="4" fill="#1a56b0"><title>Condenser Fan Motor Failure: 252 dispatches (1.9%)</title></rect><text x="366.2" y="354" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">252  ·  1.9%</text><text x="238" y="383" text-anchor="end" font-size="13" fill="#14140f">Door Seal Failure</text><rect x="250" y="371" width="96.5" height="16" rx="4" fill="#1a56b0"><title>Door Seal Failure: 229 dispatches (1.7%)</title></rect><text x="356.5" y="384" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">229  ·  1.7%</text><text x="238" y="413" text-anchor="end" font-size="13" fill="#14140f">Valve Failure</text><rect x="250" y="401" width="54.8" height="16" rx="4" fill="#1a56b0"><title>Valve Failure: 130 dispatches (1.0%)</title></rect><text x="314.8" y="414" font-size="12.5" fill="#78766f" style="font-variant-numeric:tabular-nums">130  ·  1.0%</text></svg>
+    <figcaption>Top 14 categories by dispatch count, out of 266 distinct
+      categories the model produced. Drain blockages, refrigerant leaks, and fan-motor failures
+      dominate the real faults.</figcaption>
+  </figure>
+
+  <h2>7. A long tail, and a concentrated head</h2>
+
+  <p>Case sizes are extremely uneven. <strong>732 cases
+     (40.5%) have exactly one member dispatch</strong>, while the
+     largest single case covers 547.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Coverage</th><th>Dispatches</th><th>Share of resolved</th></tr></thead>
+    <tbody><tr><td>Top 10 cases</td><td class=num>1,990</td><td class=num>15.0%</td></tr><tr><td>Top 25 cases</td><td class=num>3,339</td><td class=num>25.1%</td></tr><tr><td>Top 50 cases</td><td class=num>4,628</td><td class=num>34.8%</td></tr><tr><td>Top 100 cases</td><td class=num>6,371</td><td class=num>48.0%</td></tr><tr><td>Top 200 cases</td><td class=num>8,355</td><td class=num>62.9%</td></tr><tr><td>Top 500 cases</td><td class=num>10,903</td><td class=num>82.1%</td></tr></tbody>
+  </table></div>
+
+  <p>This is the practically useful shape: a technician-facing tool built on the top ~100 cases
+     would already recognise about half of all incoming work, while the long tail is where the
+     catalog keeps growing.</p>
+
+  <h3>Largest cases</h3>
+  <div class="tw"><table>
+    <thead><tr><th>Case</th><th>Dispatches</th><th>Category</th><th>Canonical root cause</th></tr></thead>
+    <tbody><tr><td><code>CASE-0012</code></td><td class=num>547</td><td>No Technical Fault</td><td class=q>No technical fault identified in dispatch notes.</td></tr><tr><td><code>CASE-0308</code></td><td class=num>252</td><td>Condenser Fan Motor Failure</td><td class=q>Blower motor belts was broken. There was a new belt in the unit, replaced it and got unit running. Checked out main unit and found 2 bad condenser fan…</td></tr><tr><td><code>CASE-0531</code></td><td class=num>190</td><td>Drain Blockage</td><td class=q>found drain clogged and overflowing, used vacuum and unclogged drain, found water leaking from all over the case, looked underneath and found floor dr…</td></tr><tr><td><code>CASE-0096</code></td><td class=num>166</td><td>Drain Blockage</td><td class=q>Found multiple drain pans bad on evap coils MTB-13A and MTB-13B. Also, both coils are starting to rot out, and I recommend replacing them. We also fou…</td></tr><tr><td><code>CASE-0054</code></td><td class=num>164</td><td>Sensor Failure</td><td class=q>I found an alarm on the CO2 sensor. I test the sensor and the wires. I found the wires were ok, but the sensor was bad.</td></tr><tr><td><code>CASE-0011</code></td><td class=num>148</td><td>Fan Motor Failure</td><td class=q>Tech found 1 bad evap fan motor , 1 slow EVAP fan motor and 1 wrong rotation motor (CW motor w/CCW blade) - tech replaced all 3 motors. Tech found a l…</td></tr><tr><td><code>CASE-0251</code></td><td class=num>147</td><td>Door Seal Failure</td><td class=q>Found left side 2 doors evap coil iced up, set Copeland control to manual defrost, defrost heaters are operating, found 3 of 4 doors with door gaskets…</td></tr><tr><td><code>CASE-0131</code></td><td class=num>140</td><td>Drain Blockage</td><td class=q>Found case running at -9*F with a set point of -12*F. The ceiling, back wall, and shelves were coated in frozen droplets of water. Pulled shelf pan an…</td></tr><tr><td><code>CASE-0026</code></td><td class=num>121</td><td>Contactor Failure</td><td class=q>Found breaker bad, And tripped. Replaced contactor cause the wires were melted and burnt off. Found the switching relay bad. Replaced switching relay,…</td></tr><tr><td><code>CASE-0367</code></td><td class=num>115</td><td>Coil Failure</td><td class=q>Removed deck pans and found evaporator coils iced up. Set up water hose and shut system 2N1-2, and 2N1-3 down and removed fan plenum. Deiced evaporato…</td></tr><tr><td><code>CASE-0124</code></td><td class=num>111</td><td>Refrigerant Leak</td><td class=q>Found schrader on liquid line by liquid shells leaking. Replaced schrader core and picked up no other leaks at this time. Added 50# of R507a to rack A…</td></tr><tr><td><code>CASE-0303</code></td><td class=num>111</td><td>Refrigerant Leak</td><td class=q>Found liquid line solenoid not energizing, caused by loose wire nut. Found sight glass on liquid header flashing. Leak checked and found circuit 22 li…</td></tr><tr><td><code>CASE-0045</code></td><td class=num>101</td><td>Drain Blockage</td><td class=q>Found case holding water. Used shop vacuum to clean slime out for drain track and flashed drains verified drain operation. Operation of drain is satis…</td></tr><tr><td><code>CASE-0549</code></td><td class=num>100</td><td>Coil Failure</td><td class=q>I found there was no airflow. I opened the unit and confirmed that all fans were functioning correctly; however, there was an accumulation of ice and …</td></tr><tr><td><code>CASE-0058</code></td><td class=num>98</td><td>Drain Blockage</td><td class=q>Found water leak in front side of store. Went up to rooftop. Pulled apart p-trap and cleared all debris build up. Test ran drain with water. All clear…</td></tr></tbody>
+  </table></div>
+
+  <h2>8. Data-quality findings</h2>
+
+  <div class="callout">
+    <h3>The largest "case" is not a fault</h3>
+    <p><code>CASE-0012</code> — <em>"No technical fault identified in dispatch notes"</em> — is the
+      biggest case in the catalog with 547 member dispatches.
+      It is the pipeline's own placeholder for a successful run that found no fault, not a
+      diagnosis. Together with similar entries, the <em>No Technical Fault</em> category accounts
+      for 1,656 dispatches (12.5% of everything
+      mapped). Any downstream consumer should filter it out before treating the catalog as a
+      fault taxonomy.</p>
+  </div>
+
+  <div class="callout">
+    <h3>Category labels are fragmenting</h3>
+    <p>The extraction prompt asks for a standardised 2–4 word category, but
+      <strong>266 distinct categories</strong> have emerged, and
+      175 of them (66%) carry 10 or fewer
+      dispatches. Door-related failures alone are split across <strong>14 separate
+      categories</strong> (618 dispatches) — <em>Door Seal</em>, <em>Door Gasket</em>,
+      <em>Door Handle</em>, <em>Door Hardware</em>, <em>Door Mechanism</em> and more. Fan and
+      motor failures similarly split across overlapping labels.</p>
+    <p>Note this affects the <em>category</em> field only — it is metadata, not the matching key.
+      Case identity comes from the root-cause text and the AI judge, so fragmented categories do
+      not merge or split cases. It does mean category counts should be read as indicative, and
+      a normalisation pass would make them reportable.</p>
+  </div>
+
+  <div class="callout">
+    <h3>Category and root cause can disagree</h3>
+    <p>Spot-checking the largest cases surfaces mislabels: <code>CASE-0308</code> is filed under
+      <em>Condenser Fan Motor Failure</em>, but its canonical text describes a broken blower
+      motor belt. The root-cause text — the field that drives matching — is correct; the
+      category assigned alongside it is not. Same conclusion as above: trust the text, treat the
+      category as a hint.</p>
+  </div>
+
+  <h2>9. Batch history</h2>
+
+  <div class="tw"><table>
+    <thead><tr><th>Batch</th><th>Dispatches</th><th>Mapped</th><th>No useful notes</th>
+      <th>Incomplete</th></tr></thead>
+    <tbody><tr><td><code>batch_20260728T183343Z</code></td><td class=num>5</td><td class=num>0</td><td class=num>5</td><td class=num>0</td></tr><tr><td><code>batch_20260728T183551Z</code></td><td class=num>1,000</td><td class=num>556</td><td class=num>438</td><td class=num>6</td></tr><tr><td><code>batch_20260730T023622Z</code></td><td class=num>1,000</td><td class=num>782</td><td class=num>208</td><td class=num>10</td></tr><tr><td><code>batch_20260811T091004Z</code></td><td class=num>3,000</td><td class=num>2,471</td><td class=num>529</td><td class=num>0</td></tr><tr><td><code>batch_20260814T155424Z</code></td><td class=num>10,000</td><td class=num>8,667</td><td class=num>1,324</td><td class=num>9</td></tr></tbody>
+  </table></div>
+
+  <p>Incomplete dispatches are not lost — they never enter the ledger, so they stay eligible and
+     are retried in a future batch with their committed stage results reused.</p>
+
+  <h2>10. What this supports, and what it doesn't</h2>
+
+  <p><strong>Supported today.</strong> The catalog is a sound basis for recognising repeat work:
+     86% of dispatches match something already known, the top 100 cases
+     cover roughly half of all resolved dispatches, and the deduplication ratio of 7.3×
+     is stable and improving. Retrieval-style uses — "has this failure been seen before, and
+     what was done about it" — are well served.</p>
+
+  <p><strong>Not yet supported.</strong> Treating the catalog as complete. At
+     1.03% of the corpus with a new-case rate still near
+     11%, roughly one dispatch in 9 is still novel, and the Heaps fit puts
+     the eventual catalog in the tens of thousands of cases. Frequency statistics drawn from it
+     describe the sample, not the business — and the category field needs normalisation before
+     it can carry reporting.</p>
+
+</div>
+</body>
+</html>

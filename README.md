@@ -15,10 +15,13 @@ it has already done and always picks up where it left off.
 
 ## Current status (as of this handoff)
 
-- **6,009 dispatches processed**, **821 unique cases** identified
+- **16,000 dispatches processed**, **1,808 unique cases** identified
 - The included `state/` folder and `output/chroma_cases_extracted/` vector database contain
   this full history — **do not delete or replace them**, they're what makes "process the next
   dispatches" possible instead of starting over from zero
+- Both are committed to this repo, so **a fresh clone arrives with all 16,000 dispatches
+  already processed** and continues from #16,001. Starting over is a deliberate step — see
+  *Starting over from scratch* below.
 
 ## Files included / required
 
@@ -26,6 +29,8 @@ it has already done and always picks up where it left off.
 pipeline.py               entry point — fetch and process in one run
 fetch.py                  entry point — database collection only
 process.py                entry point — processing only (no database access)
+reset_state.py            wipe progress and start the catalog over from zero
+make_report.py            regenerate output/pipeline_report.html from state
 pipelib/                  all pipeline logic (config, db, stages, llm client, reports)
 prompt_notes.txt          Stage A prompt (note-usefulness classification)
 prompt_extract.txt        Stage B prompt (verbatim root-cause extraction)
@@ -104,6 +109,37 @@ resumes from the last checkpoint.
 `python pipeline.py --count 3000` remains exactly equivalent to running the two in sequence —
 all three commands share the same code (`pipelib/runner.py`), so there is no behavioural
 difference between them.
+
+## Starting over from scratch
+
+Because the case history ships with the code, a new machine continues the existing catalog by
+default. To ignore it and rebuild from zero:
+
+```
+python reset_state.py --dry-run     # show exactly what would be cleared, change nothing
+python reset_state.py --yes         # clear it and seed an empty catalog
+python fetch.py --count 3000        # then run as normal
+python process.py
+```
+
+That one command clears the ledger, the case registry, both stage checkpoints, the batch
+archive and the vector database, then writes the two seed files the pipeline requires on
+startup. Case numbering restarts at `CASE-0001`. It refuses to run without `--yes`, and prints
+the current totals first so you can see what you are about to discard.
+
+Two details worth knowing:
+
+- **The embedding cache is kept by default.** It is keyed by a hash of the text, so it stays
+  valid across a reset and saves re-embedding everything — a straight time and API saving with
+  no effect on results. Add `--cold` if you want it dropped too.
+- **A reset is recoverable.** `state/` and `output/` are tracked in git, so the previous
+  catalog can be restored with `git checkout <commit> -- state output` as long as it was
+  committed. Check `git status` is clean before resetting.
+
+Expect the rebuilt catalog to reach similar *totals* but different *case IDs*. Selection is
+newest-first with nothing excluded, so the same dispatches come back in the same order, but
+which text mints `CASE-0001` depends on AI judgement — so case IDs are not comparable between
+runs. Compare the growth curve, not the identifiers.
 
 ### A known operational note: keep concurrency at 1
 

@@ -1,4 +1,4 @@
 .env
 .DS_Store
-pipelib/__pycache__/
+__pycache__/
 venv/
