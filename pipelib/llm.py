@@ -4,13 +4,19 @@
 - Repetition-loop hang at temperature=0 (observed once, reproducible on that
   input): client timeout 120s; on APITimeoutError retry ONCE with
   temperature=0.4 and a max_tokens cap, then raise.
+- Gateway-side 500s (backend model temporarily unavailable, e.g. "Model
+  Group=... Connection error") -> same backoff-and-retry as a connection
+  error. Observed repeatedly during live testing; previously unhandled, which
+  crashed Stage C's per-dispatch judge loop (the only caller with no
+  per-dispatch exception handling of its own).
 - Embedding responses sorted by .index before use (order not guaranteed).
 """
 import json
 import time
 
 import numpy as np
-from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
+from openai import (OpenAI, RateLimitError, APITimeoutError,
+                    APIConnectionError, InternalServerError)
 
 from . import config
 
@@ -40,7 +46,7 @@ def _chat_once(messages, temperature, max_tokens):
             print(f"Rate limit reached ({type(e).__name__}: {e}). "
                   f"Waiting 60 seconds before retrying...")
             time.sleep(60)
-        except APIConnectionError as e:
+        except (APIConnectionError, InternalServerError) as e:
             conn_failures += 1
             cause = e.__cause__
             detail = f"{type(cause).__name__}: {cause}" if cause else f"{type(e).__name__}: {e}"
@@ -87,7 +93,7 @@ def embed_texts(texts):
             except RateLimitError:
                 print("Rate limit reached on embeddings. Waiting 60 seconds...")
                 time.sleep(60)
-            except APIConnectionError:
+            except (APIConnectionError, InternalServerError):
                 conn_failures += 1
                 if conn_failures > CONN_RETRIES:
                     raise
