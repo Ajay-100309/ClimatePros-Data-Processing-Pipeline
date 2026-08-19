@@ -101,8 +101,18 @@
       <line x1="392" y1="346" x2="255" y2="434" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
       <text x="288" y="400" text-anchor="middle" font-size="13" fill="var(--secondary)">useful notes only</text>
 
-      <line x1="320" y1="501" x2="624" y2="501" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
-      <text x="472" y="489" text-anchor="middle" font-size="13" fill="var(--secondary)">root-cause text</text>
+      <line x1="320" y1="501" x2="378" y2="501" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="349" y="489" text-anchor="middle" font-size="12" fill="var(--secondary)">root-cause text</text>
+
+      <!-- Stage B2: diagnostic filter -->
+      <rect x="380" y="456" width="200" height="90" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
+      <text x="480" y="480" text-anchor="middle" font-size="12" font-weight="700" letter-spacing="0.04em" fill="var(--secondary)">STAGE B2</text>
+      <text x="480" y="500" text-anchor="middle" font-size="15.5" font-weight="700" fill="var(--ink)">Filter Non-Diagnostic</text>
+      <text x="480" y="519" text-anchor="middle" font-size="12" fill="var(--secondary)">installs / logistics / warranty</text>
+      <text x="480" y="536" text-anchor="middle" font-size="12" fill="var(--muted)">exit here — skip Stage C</text>
+
+      <line x1="580" y1="501" x2="628" y2="501" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
+      <text x="604" y="489" text-anchor="middle" font-size="11.5" fill="var(--secondary)">diagnostic only</text>
 
       <!-- exit arrow: Stage C -> up to Outputs -->
       <line x1="880" y1="440" x2="972" y2="166" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
@@ -112,7 +122,7 @@
       <rect x="330" y="580" width="490" height="50" rx="8" fill="var(--surface)" stroke="var(--grid)" stroke-width="1.2"/>
       <text x="575" y="610" text-anchor="middle" font-size="13.5" fill="var(--secondary)">State saved to disk every 10 dispatches — safe to stop and resume at any point</text>
     </svg>
-    <figcaption>Figure 1. Data enters top-left, is staged, then flows down into a three-stage processing engine — classify, extract, match — before exiting up to the outputs on the right. Every stage's full batch finishes before the next stage starts, and progress is checkpointed continuously so the pipeline can be interrupted and resumed without reprocessing or losing work.</figcaption>
+    <figcaption>Figure 1. Data enters top-left, is staged, then flows down into a four-stage processing engine — classify, extract, filter out non-diagnostic content, match — before exiting up to the outputs on the right. Every stage's full batch finishes before the next stage starts, and progress is checkpointed continuously so the pipeline can be interrupted and resumed without reprocessing or losing work. A separate offline pass, <code>consolidate.py</code>, periodically re-scans the finished case catalog for near-duplicates Stage C's forward-only design can't catch on its own — see <code>CLAUDE.md</code> for how it works.</figcaption>
   </figure>
 
   <h2>2. How Stage C actually decides: match or create?</h2>
@@ -137,7 +147,7 @@
       <rect x="240" y="122" width="480" height="82" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
       <text x="480" y="154" text-anchor="middle" font-size="17" font-weight="700" fill="var(--ink)">Embed + search case database</text>
       <text x="480" y="176" text-anchor="middle" font-size="13.5" fill="var(--secondary)">top 5 nearest cases, similarity ≥ 60%</text>
-      <text x="480" y="195" text-anchor="middle" font-size="13" fill="var(--muted)">cosine similarity — mechanical, no AI here</text>
+      <text x="480" y="195" text-anchor="middle" font-size="13" fill="var(--muted)">each case keeps up to 5 example texts — best match per case wins</text>
 
       <!-- branch: no candidates (left) -->
       <line x1="320" y1="204" x2="165" y2="258" stroke="var(--line)" stroke-width="1.8"/>
@@ -190,8 +200,10 @@
     <tbody>
       <tr><td><code>N_CANDIDATES</code></td><td>5</td><td>how many similar cases get shown to the AI judge</td></tr>
       <tr><td><code>SIM_FLOOR</code></td><td>60%</td><td>minimum similarity before a case is even considered a candidate</td></tr>
+      <tr><td><code>MAX_EXEMPLARS_PER_CASE</code></td><td>5</td><td>example texts kept per case for matching (not just the first one)</td></tr>
+      <tr><td><code>CONSOLIDATE_SIM_FLOOR</code></td><td>80%</td><td>pre-filter for <code>consolidate.py</code>'s merge candidates — the AI judge still decides</td></tr>
       <tr><td><code>NOTE_CHUNK</code></td><td>20</td><td>notes per AI call in Stage A/B, to avoid oversized prompts</td></tr>
-      <tr><td><code>MAX_WORKERS</code></td><td>1</td><td>dispatches processed concurrently (kept low — see deployment notes)</td></tr>
+      <tr><td><code>MAX_WORKERS</code></td><td>8</td><td>dispatches processed concurrently in Stage A/B/B2 (Stage C is sequential by design, not a setting)</td></tr>
       <tr><td><code>CHECKPOINT_EVERY</code></td><td>10</td><td>dispatches between progress saves to disk</td></tr>
     </tbody>
   </table>

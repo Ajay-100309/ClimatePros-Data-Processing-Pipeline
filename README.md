@@ -15,13 +15,21 @@ it has already done and always picks up where it left off.
 
 ## Current status (as of this handoff)
 
-- **16,000 dispatches processed**, **1,808 unique cases** identified
-- The included `state/` folder and `output/chroma_cases_extracted/` vector database contain
-  this full history — **do not delete or replace them**, they're what makes "process the next
-  dispatches" possible instead of starting over from zero
-- Both are committed to this repo, so **a fresh clone arrives with all 16,000 dispatches
-  already processed** and continues from #16,001. Starting over is a deliberate step — see
-  *Starting over from scratch* below.
+- **Catalog reset to zero** — `state/` and `output/chroma_cases_extracted/` were deliberately
+  cleared (`reset_state.py --yes`) before this handoff so the first run exercises the current,
+  fixed matching logic from a clean start. Next case will be `CASE-0001`.
+- The embedding cache (`state/embeddings.npy` / `embeddings_index.json`) was **kept** — it's
+  content-addressed by text hash, so it stays valid and saves re-embedding.
+- Once you run the pipeline, `state/` and `output/chroma_cases_extracted/` again become live,
+  irreplaceable progress — **do not delete or replace them** once real dispatches have been
+  processed. Both are committed to this repo, so anyone else cloning it after that point
+  inherits the full history and continues from wherever it was left.
+- A prior run against ~13,000 dispatches (before this reset) had produced 1,808 cases with the
+  old matching logic; a full offline replay of that same data with the fixes below produced
+  **955 cases** from a clean catalog — see *How cases are formed* for what changed and why.
+- **A batch of 2,000 real dispatches is already fetched and staged** (`state/batch_current.json`,
+  from `fetch.py --count 2000`) so the very first run doesn't need database access at all — see
+  *Running it for the first time* below.
 
 ## Files included / required
 
@@ -29,15 +37,17 @@ it has already done and always picks up where it left off.
 pipeline.py               entry point — fetch and process in one run
 fetch.py                  entry point — database collection only
 process.py                entry point — processing only (no database access)
+consolidate.py            entry point — offline maintenance pass, merges near-duplicate cases
 reset_state.py            wipe progress and start the catalog over from zero
 make_report.py            regenerate output/pipeline_report.html from state
 pipelib/                  all pipeline logic (config, db, stages, llm client, reports)
 prompt_notes.txt          Stage A prompt (note-usefulness classification)
 prompt_extract.txt        Stage B prompt (verbatim root-cause extraction)
+prompt_diagnostic.txt     Stage B2 prompt (filters out non-diagnostic content)
 prompt_casemap.txt        Stage C prompt (case-matching judge)
 requirements.txt          Python dependencies
-state/                    existing progress — ledger, case registry, checkpoints (KEEP)
-output/chroma_cases_extracted/   existing vector database of all 821 cases (KEEP)
+state/                    progress — ledger, case registry, checkpoints (KEEP once populated)
+output/chroma_cases_extracted/   vector database of all cases (KEEP once populated)
 ```
 
 Everything else in the original project folder (`main_*.py`, `rag_parts_recommender.py`,
@@ -71,6 +81,23 @@ run this pipeline or produce the case-growth report.
    restored from an older backup than the other), the pipeline will detect a mismatch on
    startup and refuse to run rather than silently corrupt the case catalog.
 
+## Running it for the first time
+
+A batch of 2,000 real dispatches is already staged (`state/batch_current.json`), so you can see
+the whole pipeline work end-to-end **without setting up database access first**:
+
+```
+python process.py            # processes the already-staged 2,000 dispatches, no DB needed
+python pipeline.py --stats   # check progress / final totals
+```
+
+You still need a complete `.env` — `pipelib/config.py` validates all 8 keys at startup
+regardless of which command you run, even though `process.py` never actually connects to the
+database. If you don't have `FieldJetXStg` access yet, any placeholder values for the `DB_*`
+keys will satisfy the check; just don't run `fetch.py` until they're real. If `process.py` gets
+interrupted partway through, just re-run the same command; it resumes from the last checkpoint
+(every 10 dispatches per stage).
+
 ## Running it
 
 ```
@@ -80,8 +107,8 @@ python pipeline.py --skip-fetch          # resume an interrupted batch without r
 python pipeline.py --stats               # print current ledger/case/growth totals, no processing
 ```
 
-Each run only ever touches dispatches it hasn't seen before — dispatch #1 through #6,009 will
-never be re-selected or reprocessed.
+Each run only ever touches dispatches it hasn't seen before — anything already recorded in
+`state/ledger.json` or `state/casemap.json` will never be re-selected or reprocessed.
 
 ### Running the two halves as separate commands
 
@@ -141,14 +168,25 @@ newest-first with nothing excluded, so the same dispatches come back in the same
 which text mints `CASE-0001` depends on AI judgement — so case IDs are not comparable between
 runs. Compare the growth curve, not the identifiers.
 
-### A known operational note: keep concurrency at 1
+### A known operational note: the LLM gateway is not fully reliable under load
 
-`pipelib/config.py` currently has `MAX_WORKERS = 1`. This was deliberately lowered from a
-higher value after diagnosing recurring `ReadTimeout` errors — the LLM gateway couldn't
-reliably keep up when multiple requests arrived at once, causing dropped/timed-out requests
-under concurrency. **Recommend leaving this at 1 unless you've re-tested concurrency
-specifically against the server's own gateway setup** — a different server/network path may
-behave differently, but this hasn't been re-verified.
+`pipelib/config.py` currently has `MAX_WORKERS = 8` for Stages A, B and B2 (Stage C is a plain
+sequential loop by design — see above). In practice, expect two failure modes from the gateway,
+both retried automatically with backoff by `pipelib/llm.py`, up to 8 attempts:
+
+- **Transient connection blips** (`ReadTimeout`, DNS resolution failures).
+- **Gateway-side `500 InternalServerError`** (e.g. `"Model Group=qwen3-vl... Connection
+  error"`, reported when the backend model itself is temporarily unavailable) — observed
+  repeatedly during live testing and now retried the same way as a connection blip.
+
+Both usually self-heal within a few attempts. If retries are ever exhausted: Stages A and B
+handle it per-dispatch and just leave that dispatch pending for the next run; **Stage C has no
+equivalent per-dispatch handler**, so exhausting retries there still crashes `process.py`. This
+is safe to resume (checkpointed every 10 items, `finalize()` never ran so
+`state/batch_current.json` is untouched) — just re-run `process.py` — but it's not automatic.
+If your environment sees this often, wrapping `process.py` in a restart loop is a reasonable
+stopgap; a proper fix would give Stage C the same per-dispatch resilience Stage A/B already
+have.
 
 ### Stopping and resuming is always safe
 
@@ -159,7 +197,7 @@ checkpoint — no manual recovery steps needed.
 
 ## How cases are formed
 
-Three sequential stages, run once per batch:
+Four sequential stages, run once per batch:
 
 1. **Stage A — Note classification.** Each dispatch's raw notes (technician entries, customer
    complaints, scheduling chatter, etc.) are classified note-by-note as technically useful or
@@ -169,12 +207,24 @@ Three sequential stages, run once per batch:
    stating the actual technical root cause are extracted — not summarized or reworded, just
    the exact original wording, typically 1-4 sentences.
 
-3. **Stage C — Case matching.** This is where "is this new or a repeat?" gets decided, in two
+3. **Stage B2 — Diagnostic filter.** Not every dispatch with "useful" notes is actually about a
+   technical fault — some are installation jobs, parts logistics, warranty disputes, or
+   scheduling calls that Stage B still extracted *something* from. This step reads the short
+   extracted summary and classifies whether it's a genuine diagnostic finding (including a
+   real "no fault found, confirmed by inspection" conclusion) or non-diagnostic content that
+   should never have produced a case. Non-diagnostic dispatches get a terminal ledger status
+   (`non_diagnostic`) instead of going to Stage C. Defaults to "diagnostic" when uncertain — a
+   missed filter costs one extra case; a wrongly-filtered real diagnosis costs real data.
+
+4. **Stage C — Case matching.** This is where "is this new or a repeat?" gets decided, in two
    steps:
    - **Similarity search (mechanical):** the extracted text is embedded and compared against
-     every existing case; the **5** most similar existing cases above a **60%** similarity
-     threshold become candidates. (Both values configurable in `pipelib/config.py` as
-     `N_CANDIDATES` and `SIM_FLOOR`.)
+     every existing case. Each case keeps up to **5** representative example texts (not just
+     the one that created it — a case's wording drifts as more dispatches join it, and a single
+     frozen example turned out to be the biggest single cause of unnecessary new cases). The
+     **5** most similar *cases* (best-matching example per case) above a **60%** similarity
+     threshold become candidates. (Configurable in `pipelib/config.py`: `N_CANDIDATES`,
+     `SIM_FLOOR`, `MAX_EXEMPLARS_PER_CASE`.)
    - **AI judgment (semantic):** an LLM is shown the new text alongside those candidates and
      asked whether it's the *same underlying root cause* as one of them — same component and
      same failure mode required, not just similar wording or category. If it's uncertain, it
@@ -182,8 +232,26 @@ Three sequential stages, run once per batch:
      system is deliberately tuned to favor correctness of matches over catching every possible
      match.
 
-Every dispatch ends up either matched to an existing case or creating a new one; a running
-`(dispatches processed, unique cases)` series is recorded after every resolved dispatch.
+Every dispatch ends up mapped to a case, marked non-diagnostic, or (rarely) left unresolved for
+retry; a running `(dispatches processed, unique cases)` series is recorded after every resolved
+dispatch.
+
+### Cleaning up duplicate cases after the fact (`consolidate.py`)
+
+Stage C only ever compares a new dispatch against cases that already existed *before* it — it
+never revisits old decisions. That's a real constraint (case *n* must be visible to dispatch
+*n+1*, not the other way around), but it means two near-duplicate cases can end up created at
+different points and nothing catches it automatically. `consolidate.py` is the backstop: it
+scans the existing catalog for suspiciously similar case pairs and asks the *same* cautious AI
+judge used in Stage C to confirm before merging anything — never merges on similarity alone.
+
+```
+python consolidate.py --dry-run     # see candidate pairs and judge verdicts, write nothing
+python consolidate.py               # apply confirmed merges, regenerate reports
+```
+
+Safe to run repeatedly (a clean catalog with nothing left to merge just reports zero merges).
+**Recommend running it periodically** — e.g. after every few batches — rather than only once.
 
 ## Case-growth reporting
 
@@ -197,7 +265,8 @@ This is produced automatically — no separate script needed. After every comple
 - `output/case_summary_extracted.xlsx` — one row per case with its member dispatch count
 
 **What to look for in the chart:** the gap between the actual curve and the reference
-diagonal shows how much deduplication is happening. Based on the history to date, the new-
-case rate started around 40%+ early on and has settled into a steady ~15% for the last several
-thousand dispatches — meaning roughly 1 in 6-7 new dispatches introduces a genuinely new
-problem, and the rest are recognized repeats of known issues.
+diagonal shows how much deduplication is happening. On a fresh catalog, expect the new-case
+rate to start high (nothing to match against yet) and fall as the catalog matures. Watch this
+curve early and compare it against `consolidate.py --dry-run`'s merge count over time — a
+climbing new-case rate alongside a rising merge count suggests retrieval is missing matches
+that consolidation later has to clean up, worth investigating rather than ignoring.

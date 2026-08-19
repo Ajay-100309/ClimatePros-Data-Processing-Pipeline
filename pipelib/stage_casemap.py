@@ -5,6 +5,8 @@ re-keyed by DispatchId and backed by the per-text embedding cache.
 import sys
 import json
 
+import numpy as np
+
 from . import config, llm
 from .statefiles import load_json, save_json
 
@@ -29,6 +31,22 @@ def load_state():
     return state
 
 
+def _cosine(a, b):
+    return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-12))
+
+
+def _exemplar_id(case_id, i):
+    return f"{case_id}#{i}"
+
+
+def ensure_exemplars(case):
+    """Backward-compat migration: seed exemplars from the frozen canonical text
+    for case records written before multi-exemplar retrieval existed."""
+    if "exemplars" not in case:
+        case["exemplars"] = [{"text": case["canonical"], "text_sha": case["text_sha"]}]
+    return case["exemplars"]
+
+
 def init_chroma():
     import chromadb
     from chromadb.config import Settings
@@ -47,29 +65,41 @@ def init_chroma():
 
 
 def reconcile(col, state, cache):
-    chroma_ids = set(col.get(include=[])["ids"])
-    registry_ids = set(state["cases"])
+    """Self-heals drift between the case registry and Chroma. One vector per
+    exemplar (id "CASE-XXXX#i"), not one per case — a case registry written
+    before multi-exemplar retrieval existed has no "exemplars" list yet, so
+    this also doubles as the one-time migration: every old single-vector case
+    becomes exemplar #0 under the new id scheme, rebuilt entirely from the
+    embedding cache with no new embedding calls."""
+    expected = {}  # exemplar_id -> (case_id, exemplar)
+    for case_id, case in state["cases"].items():
+        for i, ex in enumerate(ensure_exemplars(case)):
+            expected[_exemplar_id(case_id, i)] = (case_id, ex)
 
-    orphans = chroma_ids - registry_ids
+    chroma_ids = set(col.get(include=[])["ids"])
+    expected_ids = set(expected)
+
+    orphans = chroma_ids - expected_ids
     if orphans:
         print(f"Reconcile: deleting {len(orphans)} orphan vector(s).")
         col.delete(ids=list(orphans))
 
-    missing = registry_ids - chroma_ids
+    missing = expected_ids - chroma_ids
     if missing:
-        print(f"Reconcile: restoring {len(missing)} case vector(s).")
-        for case_id in missing:
-            case = state["cases"][case_id]
-            vec = cache.get(case["canonical"])
+        print(f"Reconcile: restoring {len(missing)} exemplar vector(s).")
+        for eid in missing:
+            case_id, ex = expected[eid]
+            vec = cache.get(ex["text"])
             assert vec is not None, \
-                f"{case_id} canonical text missing from embedding cache"
-            col.upsert(ids=[case_id],
+                f"{eid} exemplar text missing from embedding cache"
+            col.upsert(ids=[eid],
                        embeddings=[vec.tolist()],
-                       documents=[case["canonical"]],
-                       metadatas=[{"category": case["category"]}])
+                       documents=[ex["text"]],
+                       metadatas=[{"case_id": case_id,
+                                   "category": state["cases"][case_id]["category"]}])
 
-    assert col.count() == len(state["cases"]), \
-        f"Chroma count {col.count()} != registry {len(state['cases'])}"
+    assert col.count() == len(expected_ids), \
+        f"Chroma count {col.count()} != expected exemplar count {len(expected_ids)}"
 
 
 def _judge(text, candidates):
@@ -107,13 +137,38 @@ def _create_case(col, state, dup_cache, dispatch_id, text, category, cache):
     case_id = f"CASE-{state['next_case_num']:04d}"
     state["next_case_num"] += 1
     vec = cache.get(text)
-    col.add(ids=[case_id], embeddings=[vec.tolist()],
-            documents=[text], metadatas=[{"category": category}])
+    exemplar = {"text": text, "text_sha": config.text_sha(text)}
+    col.add(ids=[_exemplar_id(case_id, 0)], embeddings=[vec.tolist()],
+            documents=[text], metadatas=[{"case_id": case_id, "category": category}])
     state["cases"][case_id] = {"canonical": text, "category": category,
                                "dispatch_id": dispatch_id,
-                               "text_sha": config.text_sha(text)}
+                               "text_sha": config.text_sha(text),
+                               "exemplars": [exemplar]}
     dup_cache[text.strip().casefold()] = case_id
     return case_id
+
+
+def _add_exemplar_if_useful(col, state, cache, case_id, text):
+    """Grow a case's exemplar set with a genuinely new phrasing (capped, deduped)
+    so future retrieval isn't stuck matching only the one dispatch that happened
+    to create the case — the drift this fixes is directly visible in production
+    data: same-case dispatches matched by exact text can be as low as 0.75
+    cosine similarity from the original frozen canonical exemplar."""
+    case = state["cases"][case_id]
+    exemplars = ensure_exemplars(case)
+    if len(exemplars) >= config.MAX_EXEMPLARS_PER_CASE:
+        return
+    vec = cache.get(text)
+    if vec is None:
+        return
+    for ex in exemplars:
+        ex_vec = cache.get(ex["text"])
+        if ex_vec is not None and _cosine(vec, ex_vec) >= config.EXEMPLAR_DEDUP_SIM:
+            return
+    idx = len(exemplars)
+    exemplars.append({"text": text, "text_sha": config.text_sha(text)})
+    col.add(ids=[_exemplar_id(case_id, idx)], embeddings=[vec.tolist()],
+            documents=[text], metadatas=[{"case_id": case_id, "category": case["category"]}])
 
 
 def run(batch, extract_state, useful_by_dispatch):
@@ -163,23 +218,35 @@ def run(batch, extract_state, useful_by_dispatch):
             if key in dup_cache:
                 rec.update(case_id=dup_cache[key], match_type="matched_exact")
             else:
-                k = min(config.N_CANDIDATES, col.count())
+                k_raw = min(config.CANDIDATE_RAW_K, col.count())
                 candidates = []
-                if k > 0:
+                if k_raw > 0:
                     res = col.query(query_embeddings=[cache.get(text).tolist()],
-                                    n_results=k,
+                                    n_results=k_raw,
                                     include=["documents", "metadatas", "distances"])
+                    # Each case can have multiple exemplar vectors; keep only the
+                    # closest exemplar per case_id, then rank cases by that. The
+                    # judge is still shown each candidate's stable canonical text,
+                    # not the matched exemplar, so its input format is unchanged.
+                    best_per_case = {}
+                    for dist, meta in zip(res["distances"][0], res["metadatas"][0]):
+                        if dist > 1 - config.SIM_FLOOR:
+                            continue
+                        cid = (meta or {}).get("case_id")
+                        if cid is None or cid not in state["cases"]:
+                            continue
+                        if cid not in best_per_case or dist < best_per_case[cid]:
+                            best_per_case[cid] = dist
+                    ranked = sorted(best_per_case.items(), key=lambda kv: kv[1])[:config.N_CANDIDATES]
                     candidates = [
-                        (cid, dist, doc, (meta or {}).get("category", ""))
-                        for cid, dist, doc, meta in zip(
-                            res["ids"][0], res["distances"][0],
-                            res["documents"][0], res["metadatas"][0])
-                        if dist <= 1 - config.SIM_FLOOR
+                        (cid, dist, state["cases"][cid]["canonical"],
+                         state["cases"][cid]["category"])
+                        for cid, dist in ranked
                     ]
                 if not candidates:
                     case_id = _create_case(col, state, dup_cache, did, text, category, cache)
                     rec.update(case_id=case_id,
-                               match_type="new_first" if k == 0 else "new_no_candidates")
+                               match_type="new_first" if k_raw == 0 else "new_no_candidates")
                 else:
                     verdict = _judge(text, candidates)
                     if verdict == "UNRESOLVED":
@@ -190,6 +257,7 @@ def run(batch, extract_state, useful_by_dispatch):
                     else:
                         rec.update(case_id=verdict, match_type="matched_llm")
                         dup_cache[key] = verdict
+                        _add_exemplar_if_useful(col, state, cache, verdict, text)
 
             state["dispatches"][did] = rec
             if rec["case_id"]:

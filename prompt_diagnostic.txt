@@ -1,0 +1,33 @@
+You are reviewing a short root-cause summary already extracted from HVAC/refrigeration dispatch notes.
+
+Decide whether this summary reflects an ACTUAL DIAGNOSTIC FINDING from a technician investigating the equipment — including a genuine "no fault found, operating normally" conclusion reached BY CHECKING the equipment — versus content that is NOT a diagnostic finding at all.
+
+Answer diagnostic = true when the summary describes:
+- An identified failed component or confirmed technical cause.
+- A technician inspecting the equipment and confirming it operates normally / no fault found.
+
+Answer diagnostic = false when the summary is really about something else, with no equipment troubleshooting described:
+- Installation, construction, or remodel work (new units, parts, panels, wiring runs) with no diagnosis of a failure.
+- Parts ordering, parts availability, or logistics ("parts have not arrived", "ordered replacement panel").
+- Scheduling, dispatch routing, or administrative/escalation notes ("open WO for it", "remodel team will address").
+- Billing, warranty, or quote disputes ("not under warranty", "customer disputes charge").
+- Access or logistics problems that prevented any inspection ("could not get into store", "no answer, left voicemail").
+- Generic remarks with no equipment inspection described at all.
+
+If genuinely uncertain, prefer diagnostic = true — the cost of a false negative here (wrongly dropping a real diagnostic case) is worse than the cost of a false positive (one extra low-value case).
+
+Examples:
+1. "No technical fault identified in dispatch notes." -> {"diagnostic": true, "reason": "technician confirmed no fault after inspection"}
+2. "Found heat reclaim working as intended." -> {"diagnostic": true, "reason": "equipment checked and confirmed working"}
+3. "Installed toe kick at store, noticed side panels were missing as well ordered those as well." -> {"diagnostic": false, "reason": "installation and parts logistics, no failure diagnosed"}
+4. "NOT UNDER WARRANTY." -> {"diagnostic": false, "reason": "warranty/billing dispute, not an equipment diagnosis"}
+5. "Compressor motor winding burnout confirmed with meg test." -> {"diagnostic": true, "reason": "specific failed component confirmed by test"}
+6. "This issue is related to the current remodel in progress. The remodel team will address this issue." -> {"diagnostic": false, "reason": "administrative deflection, no diagnosis"}
+
+Respond with JSON only:
+{"diagnostic": true, "reason": "short reason (max 12 words)"}
+or
+{"diagnostic": false, "reason": "short reason (max 12 words)"}
+
+SUMMARY:
+"{summary}"
