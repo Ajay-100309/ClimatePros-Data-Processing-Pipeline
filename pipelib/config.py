@@ -52,6 +52,23 @@ NOTE_CHUNK = 20
 MAX_WORKERS = 8
 CHECKPOINT_EVERY = 10
 
+# Multi-exemplar case representation (Stage C). A case's single "canonical" text
+# (the dispatch that created it) stays the display name forever, but as a lone
+# embedding it's a fragile retrieval target — later same-case dispatches drift in
+# wording and can fall below SIM_FLOOR against that one frozen vector. Each case
+# instead indexes up to MAX_EXEMPLARS_PER_CASE member texts; retrieval takes the
+# best-matching exemplar per candidate case. EXEMPLAR_DEDUP_SIM skips adding a
+# new exemplar that's already near-identical to one on file.
+MAX_EXEMPLARS_PER_CASE = 5
+EXEMPLAR_DEDUP_SIM = 0.985
+CANDIDATE_RAW_K = 25
+
+# stage_consolidate.py: pre-filter for case-pair merge candidates, applied to
+# cached exemplar embeddings before any candidate pair is put to the same LLM
+# judge used online. Deliberately higher than SIM_FLOOR — consolidation is a
+# retroactive merge of already-committed cases, so it stays conservative.
+CONSOLIDATE_SIM_FLOOR = 0.80
+
 # DB snapshot goes quiet after early June 2026; the proven sample cutoff
 RECEIVED_MIN = "2013-01-01"
 RECEIVED_CUTOFF = "2026-07-01"
@@ -65,6 +82,7 @@ LEDGER_FILE = os.path.join(STATE_DIR, "ledger.json")
 CASEMAP_FILE = os.path.join(STATE_DIR, "casemap.json")
 NOTES_CLASS_FILE = os.path.join(STATE_DIR, "notes_class.json")
 EXTRACT_FILE = os.path.join(STATE_DIR, "extract.json")
+DIAGNOSTIC_FILE = os.path.join(STATE_DIR, "diagnostic.json")
 DISPATCH_META_FILE = os.path.join(STATE_DIR, "dispatch_meta.json")
 BATCH_FILE = os.path.join(STATE_DIR, "batch_current.json")
 EMB_NPY = os.path.join(STATE_DIR, "embeddings.npy")
@@ -81,6 +99,7 @@ OUT_GROWTH_PNG = os.path.join(OUTPUT_DIR, "case_growth.png")
 PROMPT_NOTES = os.path.join(HERE, "prompt_notes.txt")
 PROMPT_EXTRACT = os.path.join(HERE, "prompt_extract.txt")
 PROMPT_CASEMAP = os.path.join(HERE, "prompt_casemap.txt")
+PROMPT_DIAGNOSTIC = os.path.join(HERE, "prompt_diagnostic.txt")
 
 NO_FAULT_PLACEHOLDER = "No technical fault identified in dispatch notes."
 

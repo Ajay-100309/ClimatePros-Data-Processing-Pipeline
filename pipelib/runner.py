@@ -9,7 +9,8 @@ different network access — as long as they share the same state/ directory.
 import os
 
 from . import config, ledger, reports, statefiles
-from . import stage_fetch, stage_notes, stage_extract, stage_casemap
+from . import (stage_fetch, stage_notes, stage_extract, stage_diagnostic,
+              stage_casemap, stage_consolidate)
 from .statefiles import load_json, save_json
 
 
@@ -57,6 +58,14 @@ def fetch(count, dry_run=False):
     return stage_fetch.stage_batch(count, dry_run=dry_run)
 
 
+def consolidate(dry_run=False):
+    """Offline maintenance pass over the finished case catalog — see
+    stage_consolidate for why this exists. No DB access, no staged batch."""
+    statefiles.ensure_dirs()
+    check_state()
+    return stage_consolidate.run(dry_run=dry_run)
+
+
 def process(batch):
     """Run stages A/B/C over a staged batch and finalize it. No DB access."""
     statefiles.ensure_dirs()
@@ -68,12 +77,15 @@ def process(batch):
           f"zero-useful: {sum(1 for v in useful.values() if not v)}")
 
     extract_state = stage_extract.run(batch, useful)
-    casemap_state = stage_casemap.run(batch, extract_state, useful)
+    diag_state = stage_diagnostic.run(batch, extract_state)
+    diagnostic_extract = {did: rec for did, rec in extract_state.items()
+                          if diag_state.get(did, {}).get("diagnostic", True)}
+    casemap_state = stage_casemap.run(batch, diagnostic_extract, useful)
 
-    finalize(batch, notes_state, extract_state, casemap_state)
+    finalize(batch, notes_state, extract_state, diag_state, casemap_state)
 
 
-def finalize(batch, notes_state, extract_state, casemap_state):
+def finalize(batch, notes_state, extract_state, diag_state, casemap_state):
     led = ledger.load()
     useful = stage_notes.useful_notes(batch, notes_state)
     outcomes = {}
@@ -86,10 +98,19 @@ def finalize(batch, notes_state, extract_state, casemap_state):
             ledger.mark(led, did, "no_useful_notes", "", batch["batch_id"])
             outcomes[did] = "no_useful_notes"
             continue
+        if did not in extract_state:
+            outcomes[did] = "incomplete_stage_b"
+            continue
+        if did not in diag_state:
+            outcomes[did] = "incomplete_stage_b2"
+            continue
+        if not diag_state[did]["diagnostic"]:
+            ledger.mark(led, did, "non_diagnostic", "", batch["batch_id"])
+            outcomes[did] = "non_diagnostic"
+            continue
         rec = casemap_state["dispatches"].get(did)
         if rec is None:
-            outcomes[did] = "incomplete_stage_b" if did not in extract_state \
-                else "incomplete_stage_c"
+            outcomes[did] = "incomplete_stage_c"
             continue
         if not rec["case_id"]:
             outcomes[did] = "unresolved"
