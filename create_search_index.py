@@ -2,13 +2,16 @@
 
 The index name is versioned by embedding model (AZURE_SEARCH_INDEX, default
 dispatches-nomic768-v1) because vector dimensions are immutable on a live
-index: an embedding-model change means a NEW name here plus a backfill rerun,
-never an in-place schema edit. Creation refuses to touch an existing index —
+index: an embedding-model change means a NEW name here plus a backfill rerun.
+Additive non-vector fields are the one allowed in-place edit (--update); after
+one, run backfill_search.py --refresh-parts --force-push to populate the new
+field on existing documents. Creation refuses to touch an existing index —
 --recreate --yes is the only (destructive) way to rebuild in place.
 
 Usage:
     venv/bin/python create_search_index.py              # create if absent
     venv/bin/python create_search_index.py --show       # print the live schema
+    venv/bin/python create_search_index.py --update     # additive in-place field update
     venv/bin/python create_search_index.py --recreate --yes   # delete + rebuild
 """
 import sys
@@ -50,6 +53,8 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--show", action="store_true",
                     help="print the live index schema and exit")
+    ap.add_argument("--update", action="store_true",
+                    help="push additive field changes onto the existing index")
     ap.add_argument("--recreate", action="store_true",
                     help="delete the existing index first (DESTRUCTIVE)")
     ap.add_argument("--yes", action="store_true",
@@ -58,6 +63,9 @@ def main():
 
     if args.show:
         show()
+        return
+    if args.update:
+        search_index.update_index()
         return
     if args.recreate and not args.yes:
         sys.exit("--recreate deletes every indexed document. "

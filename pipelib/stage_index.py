@@ -28,15 +28,21 @@ def save_state(state):
     save_json(config.SEARCH_STATE_FILE, state)
 
 
-def index_items(items, cache, state, client=None):
+def index_items(items, cache, state, client=None, force=False):
     """items: [{did, text, category}], text non-empty. Embeds anything missing
-    from the cache, builds documents, upserts in batches, records progress."""
+    from the cache, builds documents, upserts in batches, records progress.
+    force=True re-pushes even when the root-cause text is unchanged — needed
+    after an additive schema update, where only non-text fields (e.g. parts
+    enrichment) changed and the text_sha skip would otherwise skip every doc."""
     meta = load_json(config.DISPATCH_META_FILE, {})
     parts_state = load_json(config.PARTS_FILE, {"schema": 1, "dispatches": {}})
 
-    todo = [it for it in items
-            if state["pushed"].get(it["did"], {}).get("text_sha")
-            != config.text_sha(it["text"])]
+    if force:
+        todo = list(items)
+    else:
+        todo = [it for it in items
+                if state["pushed"].get(it["did"], {}).get("text_sha")
+                != config.text_sha(it["text"])]
     print(f"\n=== Stage D: search index — {len(items)} candidates, "
           f"{len(items) - len(todo)} already pushed, {len(todo)} to push ===")
     if not todo:

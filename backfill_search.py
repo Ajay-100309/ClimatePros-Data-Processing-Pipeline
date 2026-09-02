@@ -22,6 +22,10 @@ Usage:
     venv/bin/python backfill_search.py --limit 50      # small slice first
     venv/bin/python backfill_search.py                 # full backfill / reconcile
     venv/bin/python backfill_search.py --refresh-parts # force re-pull of parts
+    venv/bin/python backfill_search.py --refresh-parts --force-push
+        # re-push docs whose text is unchanged — the sequence after an additive
+        # schema update (create_search_index.py --update), so re-pulled parts
+        # fields reach documents the text_sha skip would otherwise leave stale
 """
 import sys
 import argparse
@@ -88,6 +92,9 @@ def main():
                     help="only process the first N dispatches (by id)")
     ap.add_argument("--refresh-parts", action="store_true",
                     help="re-pull parts from the DB even if already cached")
+    ap.add_argument("--force-push", action="store_true",
+                    help="re-push documents even when the root-cause text is "
+                         "unchanged (after an additive schema update)")
     args = ap.parse_args()
 
     ensure_dirs()
@@ -110,7 +117,7 @@ def main():
     ensure_parts(items, args.refresh_parts)
 
     cache = EmbCache()
-    state = stage_index.index_items(items, cache, state)
+    state = stage_index.index_items(items, cache, state, force=args.force_push)
     stage_index.write_popularity(state)
     print(f"\nDone. {len(state['pushed'])} dispatches recorded as pushed to "
           f"index '{state['index']}'.")

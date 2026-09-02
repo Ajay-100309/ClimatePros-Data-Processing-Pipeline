@@ -2,9 +2,12 @@
 
 One index, one document per dispatch, versioned by name (config.AZURE_SEARCH_INDEX,
 default dispatches-nomic768-v1). Vector dimensions are immutable on a live index,
-so an embedding-model change means a NEW index name plus a backfill rerun — never
-an in-place edit. Only real parts are indexed (catalog number present, NonPart=0,
-qty>0, InventoryId resolved); consumables stay in state/parts.json only.
+so an embedding-model change means a NEW index name plus a backfill rerun.
+Additive non-vector fields are the one allowed in-place edit: update_index()
+(create_search_index.py --update) pushes the current definition onto the live
+index, then a --refresh-parts --force-push backfill populates the new field.
+Only real parts are indexed (catalog number present, NonPart=0, qty>0,
+InventoryId resolved); consumables stay in state/parts.json only.
 """
 from datetime import datetime, timezone
 
@@ -41,6 +44,8 @@ def index_definition():
                               filterable=True),
                 m.SimpleField(name="partNo", type=m.SearchFieldDataType.String,
                               filterable=True, facetable=True),
+                m.SimpleField(name="unitedPartNo", type=m.SearchFieldDataType.String,
+                              filterable=True),
                 m.SimpleField(name="name", type=m.SearchFieldDataType.String),
                 m.SimpleField(name="qty", type=m.SearchFieldDataType.Double),
             ]),
@@ -95,6 +100,22 @@ def create_index(recreate=False):
           f"(768-dim cosine HNSW, key=dispatchId).")
 
 
+def update_index():
+    """Additive in-place schema update: push the current index_definition()
+    onto the existing live index. Azure accepts new fields on a live index;
+    anything structural (vector dims, key, removed fields) is rejected
+    server-side, so this cannot silently rebuild."""
+    client = index_client()
+    if config.AZURE_SEARCH_INDEX not in client.list_index_names():
+        raise SystemExit(
+            f"Index '{config.AZURE_SEARCH_INDEX}' does not exist — nothing to "
+            "update. Run create_search_index.py without --update to create it.")
+    client.create_or_update_index(index_definition())
+    print(f"Updated index '{config.AZURE_SEARCH_INDEX}' in place "
+          "(additive fields only; existing documents keep null for new fields "
+          "until re-pushed).")
+
+
 def _received_dt_utc(value):
     # dispatch_meta stores tz-naive SQL Server datetimes; Edm.DateTimeOffset
     # requires an offset, and staging times are treated as UTC by convention
@@ -114,6 +135,7 @@ def real_parts(part_items):
 def build_document(did, text, category, meta_rec, part_items, vector):
     meta_rec = meta_rec or {}
     parts = [{"inventoryId": p["inventory_id"], "partNo": p["part_no"],
+              "unitedPartNo": p.get("united_part_no", ""),
               "name": p["name"], "qty": float(p["qty"])}
              for p in real_parts(part_items)]
     doc = {

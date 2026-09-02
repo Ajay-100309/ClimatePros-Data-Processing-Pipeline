@@ -3,6 +3,14 @@ Parts SQL adapted from the Dispatch research repo's build_case_parts_dataset.py:
 DispatchParts carries no InventoryId, so the InventoryLocationXREF hop is
 mandatory to reach the catalog item. All queries parameterized; %% escapes
 LIKE wildcards for pymssql.
+
+united_part_no is United Refrigeration's own catalog number (the namespace the
+United inventory API's `item` field requires), resolved per item from
+InventorySupplierXREF. A correlated TOP-1 subquery — not a join — because the
+xref averages ~3.7 rows per item and a join would fan out SUM(dp.Quantity).
+Active suppliers matched by name (12 duplicate United rows exist; no canonical
+SupplierId), and xref rows whose "United number" merely repeats the internal
+Inventory.Number are excluded — those are known false cross-references.
 """
 from . import config
 
@@ -34,7 +42,16 @@ SELECT dp.DispatchId,
        inv.NonPart,
        COALESCE(c.InventoryCategoryName, '')                       AS inv_cat,
        COALESCE(sc.InventorySubCategoryName, '')                   AS inv_subcat,
-       SUM(dp.Quantity) AS qty
+       SUM(dp.Quantity) AS qty,
+       (SELECT TOP 1 LTRIM(RTRIM(sx.PartNumber))
+        FROM dbo.InventorySupplierXREF sx
+        JOIN dbo.Supplier s ON s.SupplierId = sx.SupplierId
+        WHERE sx.InventoryId = xr.InventoryId
+          AND s.IsActive = 1
+          AND s.SupplierName LIKE '%%united%%refrig%%'
+          AND LTRIM(RTRIM(ISNULL(sx.PartNumber, ''))) <> ''
+          AND LTRIM(RTRIM(sx.PartNumber)) <> LTRIM(RTRIM(ISNULL(inv.Number, '')))
+        ORDER BY sx.UpdateDt DESC) AS united_part_no
 FROM dbo.DispatchParts dp
 LEFT JOIN dbo.InventoryLocationXREF xr ON xr.InventoryLocationXREFId = dp.InventoryLocationXREFId
 LEFT JOIN dbo.Inventory inv ON inv.InventoryId = xr.InventoryId
@@ -131,5 +148,6 @@ def fetch_parts_for(conn, dispatch_ids):
                 "consumable": bool(r["NonPart"]),
                 "inv_cat": r["inv_cat"],
                 "inv_subcat": r["inv_subcat"],
+                "united_part_no": (r["united_part_no"] or "").strip(),
             })
     return parts

@@ -106,8 +106,10 @@ One-time setup (already done for `cp-search-dev`) and the backfill/reconcile com
 ```
 python create_search_index.py            # create the index (refuses if it exists)
 python create_search_index.py --show     # print the live schema
+python create_search_index.py --update   # additive in-place field update
 python backfill_search.py --dry-run      # what would be pushed, writes nothing
 python backfill_search.py                # push all processed history not yet indexed
+python backfill_search.py --refresh-parts --force-push   # after --update: repopulate all docs
 ```
 
 `backfill_search.py` is rerunnable and skips whatever is already pushed, which makes it the
@@ -116,7 +118,13 @@ before this feature, a freshly re-created index — after `--recreate`, also del
 `state/search_index.json` so the push record matches the empty index). The embedding model
 is pinned (`nomic-embed`, 768-dim, no prefix); switching models later means a **new**
 `AZURE_SEARCH_INDEX` name plus a backfill rerun — vector dimensions cannot change on a live
-index.
+index. Additive non-vector fields are the exception: `--update` pushes them onto the live
+index, and `--refresh-parts --force-push` re-pulls parts from the DB and re-pushes every
+document so the new field is populated (documents keep null for it until re-pushed).
+
+Each indexed part carries `unitedPartNo` — United Refrigeration's own catalog number,
+resolved from `InventorySupplierXREF` (active United suppliers only, false self-referencing
+cross-references excluded; empty when the item has no United mapping).
 
 ### Running the two halves as separate commands
 
