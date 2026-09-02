@@ -1,23 +1,34 @@
 """Orchestration shared by the fetch-only, process-only, and combined CLIs.
 
 The two halves meet at state/batch_current.json: fetch() is the only step that
-opens a DB connection and it just writes the work order; process() consumes
-that file and never touches the DB. Nothing else crosses the boundary, so the
-halves can run as separate commands, on separate schedules, or from hosts with
-different network access — as long as they share the same state/ directory.
+opens a DB connection and it just writes the work order (dispatch headers,
+notes, and recorded parts); process() consumes that file and never touches the
+DB. Nothing else crosses the boundary, so the halves can run as separate
+commands, on separate schedules, or from hosts with different network access —
+as long as they share the same state/ directory.
+
+Two process modes share the A/B stages:
+- default (parts-finder indexing): A -> B -> Stage D (embed + push to Azure AI
+  Search). Terminal ledger statuses: indexed, no_fault, no_useful_notes. The
+  casemap fingerprint guard is NOT consulted — Stage C never runs.
+- --with-cases (legacy case mapping): A -> B -> C -> D. Stage C behavior and
+  its "mapped" ledger status are unchanged; documents are still pushed so a
+  cases-mode run can never leave a dispatch terminal-but-unindexed.
 """
 import os
 
 from . import config, ledger, reports, statefiles
-from . import stage_fetch, stage_notes, stage_extract, stage_casemap
+from . import stage_fetch, stage_notes, stage_extract, stage_casemap, stage_index
 from .statefiles import load_json, save_json
 
 
-def check_state():
-    """Fail fast on unusable ledger/casemap state before any expensive work —
-    a fingerprint mismatch must not surface only after a batch of LLM calls."""
+def check_state(with_cases=False):
+    """Fail fast on unusable state before any expensive work — a casemap
+    fingerprint mismatch must not surface only after a batch of LLM calls,
+    but it only matters when Stage C is actually going to run."""
     ledger.load()
-    stage_casemap.load_state()
+    if with_cases:
+        stage_casemap.load_state()
 
 
 def staged_batch():
@@ -39,6 +50,10 @@ def stats():
     print(f"Mapped dispatches: {len(casemap.get('dispatches', {}))}")
     if growth:
         print(f"Growth series: {len(growth)} points, last {growth[-1]}")
+    search_state = load_json(config.SEARCH_STATE_FILE)
+    if search_state:
+        print(f"Search index '{search_state.get('index')}': "
+              f"{len(search_state.get('pushed', {}))} documents pushed")
     staged = staged_batch()
     if staged:
         print(f"In-flight batch: {staged['batch_id']} "
@@ -57,10 +72,13 @@ def fetch(count, dry_run=False):
     return stage_fetch.stage_batch(count, dry_run=dry_run)
 
 
-def process(batch):
-    """Run stages A/B/C over a staged batch and finalize it. No DB access."""
+def process(batch, with_cases=False):
+    """Run stages A/B (+C with --with-cases) then Stage D, and finalize."""
     statefiles.ensure_dirs()
-    check_state()
+    check_state(with_cases)
+    if not with_cases:
+        # Stage D is the only reason this mode runs — refuse before LLM spend
+        config.require_search_config()
 
     notes_state = stage_notes.run(batch)
     useful = stage_notes.useful_notes(batch, notes_state)
@@ -68,12 +86,14 @@ def process(batch):
           f"zero-useful: {sum(1 for v in useful.values() if not v)}")
 
     extract_state = stage_extract.run(batch, useful)
-    casemap_state = stage_casemap.run(batch, extract_state, useful)
+    casemap_state = (stage_casemap.run(batch, extract_state, useful)
+                     if with_cases else None)
+    index_state = stage_index.run(batch, extract_state, useful)
 
-    finalize(batch, notes_state, extract_state, casemap_state)
+    finalize(batch, notes_state, extract_state, index_state, casemap_state)
 
 
-def finalize(batch, notes_state, extract_state, casemap_state):
+def finalize(batch, notes_state, extract_state, index_state, casemap_state=None):
     led = ledger.load()
     useful = stage_notes.useful_notes(batch, notes_state)
     outcomes = {}
@@ -86,22 +106,42 @@ def finalize(batch, notes_state, extract_state, casemap_state):
             ledger.mark(led, did, "no_useful_notes", "", batch["batch_id"])
             outcomes[did] = "no_useful_notes"
             continue
-        rec = casemap_state["dispatches"].get(did)
-        if rec is None:
-            outcomes[did] = "incomplete_stage_b" if did not in extract_state \
-                else "incomplete_stage_c"
-            continue
-        if not rec["case_id"]:
-            outcomes[did] = "unresolved"
-            continue
-        ledger.mark(led, did, "mapped", rec["case_id"], batch["batch_id"])
-        outcomes[did] = f"mapped:{rec['case_id']}"
+        if casemap_state is not None:
+            rec = casemap_state["dispatches"].get(did)
+            if rec is None:
+                outcomes[did] = "incomplete_stage_b" if did not in extract_state \
+                    else "incomplete_stage_c"
+                continue
+            if not rec["case_id"]:
+                outcomes[did] = "unresolved"
+                continue
+            ledger.mark(led, did, "mapped", rec["case_id"], batch["batch_id"])
+            outcomes[did] = f"mapped:{rec['case_id']}"
+        else:
+            rec = extract_state.get(did)
+            if rec is None:
+                outcomes[did] = "incomplete_stage_b"
+                continue
+            if not rec["root_cause"].strip():
+                # nothing to index; terminal so it is never refetched
+                ledger.mark(led, did, "no_fault", "", batch["batch_id"])
+                outcomes[did] = "no_fault"
+                continue
+            if did in index_state["pushed"]:
+                ledger.mark(led, did, "indexed", "", batch["batch_id"])
+                outcomes[did] = "indexed"
+            else:
+                # push failed — stays out of the ledger, eligible next run,
+                # where the committed A/B results are reused for free
+                outcomes[did] = "incomplete_stage_d"
 
     incomplete = [d for d, o in outcomes.items()
                   if o.startswith("incomplete") or o == "unresolved"]
 
     ledger.save(led)
-    reports.write_all(casemap_state)
+    if casemap_state is not None:
+        reports.write_all(casemap_state)
+    stage_index.write_popularity(index_state)
 
     archive = dict(batch)
     archive["outcomes"] = outcomes
@@ -116,6 +156,8 @@ def finalize(batch, notes_state, extract_state, casemap_state):
     if incomplete:
         print(f"  Incomplete: {incomplete}")
     print(f"Ledger now {len(led['dispatches'])} dispatches; "
-          f"cases {len(casemap_state['cases'])}; "
-          f"growth last point {casemap_state['growth'][-1]}.")
+          f"search index has {len(index_state['pushed'])} documents pushed.")
+    if casemap_state is not None:
+        print(f"Cases {len(casemap_state['cases'])}; "
+              f"growth last point {casemap_state['growth'][-1]}.")
     print(f"Batch archive: {archive_path}")

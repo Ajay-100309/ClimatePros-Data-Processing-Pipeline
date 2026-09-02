@@ -48,6 +48,8 @@ def targets(cold):
         ("stage A checkpoints", config.NOTES_CLASS_FILE),
         ("stage B checkpoints", config.EXTRACT_FILE),
         ("dispatch display metadata", config.DISPATCH_META_FILE),
+        ("recorded parts", config.PARTS_FILE),
+        ("search push record", config.SEARCH_STATE_FILE),
         ("staged work order", config.BATCH_FILE),
         ("batch archive", config.BATCH_ARCHIVE_DIR),
         ("case vector DB", config.CHROMA_DIR),
@@ -122,6 +124,8 @@ def main():
     seed()
     print(f"\nReset complete. Ledger and case catalog are empty; "
           f"next case will be CASE-0001.")
+    print("NOTE: the Azure AI Search index is NOT touched by this reset — "
+          "rebuild it with create_search_index.py --recreate --yes if needed.")
     print("Next: venv/bin/python fetch.py --count 3000")
     print("      venv/bin/python process.py")
 

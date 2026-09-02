@@ -1,0 +1,34 @@
+Target scale: 1,551,773 vectors, 768 dims (nomic-embed), M=8
+Rough memory estimate before starting: ~4.62 GB
+
+  inserted   100,000 / 1,551,773  (  31.3s elapsed, 3,190 vec/s, peak RSS so far: 1.18 GB)
+  inserted   200,000 / 1,551,773  (  65.8s elapsed, 3,040 vec/s, peak RSS so far: 1.47 GB)
+  inserted   300,000 / 1,551,773  ( 100.9s elapsed, 2,973 vec/s, peak RSS so far: 1.78 GB)
+  inserted   400,000 / 1,551,773  ( 138.8s elapsed, 2,883 vec/s, peak RSS so far: 1.78 GB)
+  inserted   500,000 / 1,551,773  ( 208.0s elapsed, 2,404 vec/s, peak RSS so far: 1.78 GB)
+  inserted   600,000 / 1,551,773  ( 281.2s elapsed, 2,134 vec/s, peak RSS so far: 1.84 GB)
+  inserted   700,000 / 1,551,773  ( 360.1s elapsed, 1,944 vec/s, peak RSS so far: 2.14 GB)
+  inserted   800,000 / 1,551,773  ( 512.5s elapsed, 1,561 vec/s, peak RSS so far: 2.44 GB)
+  inserted   900,000 / 1,551,773  ( 600.2s elapsed, 1,499 vec/s, peak RSS so far: 2.75 GB)
+  inserted 1,000,000 / 1,551,773  ( 961.5s elapsed, 1,040 vec/s, peak RSS so far: 3.03 GB)
+  inserted 1,100,000 / 1,551,773  (1231.0s elapsed, 894 vec/s, peak RSS so far: 3.34 GB)
+  inserted 1,200,000 / 1,551,773  (2158.7s elapsed, 556 vec/s, peak RSS so far: 3.57 GB)
+  inserted 1,300,000 / 1,551,773  (3892.5s elapsed, 334 vec/s, peak RSS so far: 3.57 GB)
+  inserted 1,400,000 / 1,551,773  (6630.2s elapsed, 211 vec/s, peak RSS so far: 3.57 GB)
+  inserted 1,500,000 / 1,551,773  (10670.3s elapsed, 141 vec/s, peak RSS so far: 3.57 GB)
+  inserted 1,551,773 / 1,551,773  (13275.9s elapsed, 117 vec/s, peak RSS so far: 3.57 GB)
+
+Index build complete: 13275.9s for 1,551,773 vectors (117 vec/s). Peak RSS: 3.57 GB
+
+=== Query latency by top-N, 300 queries each, 1,551,773-vector index ===
+top-N   ef_search  mean ms   median ms   p95 ms    max ms
+10      64         122.31    121.20      187.09    316.11
+50      100        88.08     83.14       165.95    240.34
+100     200        347.73    336.77      499.95    886.02
+200     400        601.27    592.82      736.31    898.99
+500     1000       1586.65   1555.20     2004.35   2617.17
+1000    2000       2980.77   2918.90     3658.28   5385.47
+
+Extrapolation to bge-m3 (1024-dim, production spec, not directly tested here to avoid an out-of-memory run on this machine):
+  Raw vector memory scales with dimension: 1,551,773 x 1024 x 4 bytes = 5.92 GB before graph overhead, vs 4.44 GB measured here at 768-dim.
+  Per-query distance computation scales roughly linearly with dimension (1024/768 = 1.33x), so expect query latency in the same ballpark, scaled up by roughly that factor, not a different order of magnitude. This is an estimate, not a measurement -- confirming it needs the actual production embedding model and hardware.

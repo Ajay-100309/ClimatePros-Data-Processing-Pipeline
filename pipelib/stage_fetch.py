@@ -38,6 +38,7 @@ def stage_batch(count, dry_run=False):
 
         ids = [h["dispatch_id"] for h in selected]
         notes = db.fetch_notes_for(conn, ids)
+        parts = db.fetch_parts_for(conn, ids)
     finally:
         conn.close()
 
@@ -72,7 +73,19 @@ def stage_batch(count, dry_run=False):
         }
     save_json(config.DISPATCH_META_FILE, meta)
 
-    print(f"Staged batch {batch['batch_id']}: {len(dispatches)} dispatches.")
+    # recorded parts per staged dispatch — an explicit [] means "checked, none
+    # recorded", so the process half never needs the DB to tell the difference
+    parts_state = load_json(config.PARTS_FILE, {"schema": 1, "dispatches": {}})
+    for d in dispatches:
+        parts_state["dispatches"][d["dispatch_id"]] = {
+            "fetched_at": batch["fetched_at"],
+            "items": parts.get(d["dispatch_id"], []),
+        }
+    save_json(config.PARTS_FILE, parts_state)
+
+    with_parts = sum(1 for d in dispatches if parts.get(d["dispatch_id"]))
+    print(f"Staged batch {batch['batch_id']}: {len(dispatches)} dispatches "
+          f"({with_parts} with recorded parts).")
     return batch
 
 

@@ -6,3 +6,4 @@ chromadb>=1.0,<2
 numpy
 matplotlib
 pymssql==2.3.13
+azure-search-documents==11.5.3

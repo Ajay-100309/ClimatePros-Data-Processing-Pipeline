@@ -46,6 +46,23 @@ EMBED_PREFIX = ""
 EMBED_BATCH = 100
 EMBED_TRUNCATE = 4000
 
+# Azure AI Search (Stage D). Optional at import so --stats/make_report/reset
+# keep working on hosts without search credentials; require_search_config()
+# gates the commands that actually push documents.
+AZURE_SEARCH_ENDPOINT = _env("AZURE_SEARCH_ENDPOINT", required=False)
+AZURE_SEARCH_API_KEY = _env("AZURE_SEARCH_API_KEY", required=False)
+AZURE_SEARCH_INDEX = _env("AZURE_SEARCH_INDEX", required=False) or "dispatches-nomic768-v1"
+SEARCH_UPLOAD_BATCH = 500
+# Stamped on every document; a mixed-model index can then never happen silently.
+SEARCH_EMBED_MODEL_TAG = "nomic-embed-768"
+
+
+def require_search_config():
+    missing = [n for n, v in (("AZURE_SEARCH_ENDPOINT", AZURE_SEARCH_ENDPOINT),
+                              ("AZURE_SEARCH_API_KEY", AZURE_SEARCH_API_KEY)) if not v]
+    if missing:
+        sys.exit(f"Missing required .env keys for search indexing: {', '.join(missing)}")
+
 N_CANDIDATES = 5
 SIM_FLOOR = 0.60
 NOTE_CHUNK = 20
@@ -63,6 +80,8 @@ BATCH_ARCHIVE_DIR = os.path.join(STATE_DIR, "batches")
 
 LEDGER_FILE = os.path.join(STATE_DIR, "ledger.json")
 CASEMAP_FILE = os.path.join(STATE_DIR, "casemap.json")
+PARTS_FILE = os.path.join(STATE_DIR, "parts.json")
+SEARCH_STATE_FILE = os.path.join(STATE_DIR, "search_index.json")
 NOTES_CLASS_FILE = os.path.join(STATE_DIR, "notes_class.json")
 EXTRACT_FILE = os.path.join(STATE_DIR, "extract.json")
 DISPATCH_META_FILE = os.path.join(STATE_DIR, "dispatch_meta.json")
@@ -77,6 +96,7 @@ OUT_MAPPED = os.path.join(OUTPUT_DIR, "Dispatch_CaseMapped.xlsx")
 OUT_CASES = os.path.join(OUTPUT_DIR, "case_summary_extracted.xlsx")
 OUT_GROWTH_XLSX = os.path.join(OUTPUT_DIR, "case_growth.xlsx")
 OUT_GROWTH_PNG = os.path.join(OUTPUT_DIR, "case_growth.png")
+OUT_PART_POPULARITY = os.path.join(OUTPUT_DIR, "part_popularity.json")
 
 PROMPT_NOTES = os.path.join(HERE, "prompt_notes.txt")
 PROMPT_EXTRACT = os.path.join(HERE, "prompt_extract.txt")

@@ -1,9 +1,12 @@
 """New-dispatch automation pipeline: fetch and process in one run.
 
 Fetch N never-processed dispatches from FieldJetXStg, classify note usefulness,
-extract verbatim root causes, map them into the persistent case vector DB, and
-extend the dispatches-vs-cases growth series. Fully resumable; no dispatch is
-ever processed twice.
+extract verbatim root causes, then embed each root cause and push it (with the
+dispatch's recorded parts) into the Azure AI Search index that serves the Parts
+Finder. Fully resumable; no dispatch is ever processed twice.
+
+Case mapping (the unique-case catalog and its reports) no longer runs by
+default — pass --with-cases to also run Stage C exactly as before.
 
 The same two halves are also available as separate commands — fetch.py stages
 the batch, process.py consumes it — split at state/batch_current.json. All
@@ -11,7 +14,8 @@ three entry points share pipelib/runner.py, so the behaviour is identical
 either way.
 
 Usage:
-    venv/bin/python pipeline.py --count 200       # fetch + process a batch
+    venv/bin/python pipeline.py --count 200       # fetch + A/B + index a batch
+    venv/bin/python pipeline.py --count 200 --with-cases   # legacy: also Stage C
     venv/bin/python pipeline.py --count 5 --dry-run
     venv/bin/python pipeline.py --skip-fetch      # process the staged batch
     venv/bin/python pipeline.py --stats
@@ -32,6 +36,9 @@ def main():
                     help="resume the staged batch (error if none)")
     ap.add_argument("--stats", action="store_true",
                     help="print ledger/case/growth summary and exit")
+    ap.add_argument("--with-cases", action="store_true",
+                    help="also run Stage C case-mapping and regenerate the "
+                         "case reports (legacy default)")
     args = ap.parse_args()
 
     if args.stats:
@@ -51,7 +58,7 @@ def main():
         if args.dry_run:
             return
 
-    runner.process(batch)
+    runner.process(batch, with_cases=args.with_cases)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,8 @@
-"""FieldJetXStg access. Candidate SQL adapted from build_1k/extract.py (proven),
-minus the parts-usage requirement (root-cause pipeline needs notes, not parts).
-All queries parameterized; %% escapes LIKE wildcards for pymssql.
+"""FieldJetXStg access. Candidate SQL adapted from build_1k/extract.py (proven).
+Parts SQL adapted from the Dispatch research repo's build_case_parts_dataset.py:
+DispatchParts carries no InventoryId, so the InventoryLocationXREF hop is
+mandatory to reach the catalog item. All queries parameterized; %% escapes
+LIKE wildcards for pymssql.
 """
 from . import config
 
@@ -20,6 +22,29 @@ WHERE d.IsConstruction = 0
               WHERE dn.DispatchId = d.DispatchId
                 AND LEN(dn.DispatchNotes) > %(min_note)s)
 ORDER BY d.ReceivedDateTime DESC;
+"""
+
+
+PARTS_SQL = """
+SELECT dp.DispatchId,
+       xr.InventoryId,
+       COALESCE(NULLIF(LTRIM(RTRIM(inv.Number)), ''), '')          AS part_no,
+       COALESCE(NULLIF(LTRIM(RTRIM(inv.InventoryDesc)), ''), '')   AS desc_short,
+       COALESCE(NULLIF(LTRIM(RTRIM(inv.InventoryName)), ''), '')   AS inv_name,
+       inv.NonPart,
+       COALESCE(c.InventoryCategoryName, '')                       AS inv_cat,
+       COALESCE(sc.InventorySubCategoryName, '')                   AS inv_subcat,
+       SUM(dp.Quantity) AS qty
+FROM dbo.DispatchParts dp
+LEFT JOIN dbo.InventoryLocationXREF xr ON xr.InventoryLocationXREFId = dp.InventoryLocationXREFId
+LEFT JOIN dbo.Inventory inv ON inv.InventoryId = xr.InventoryId
+LEFT JOIN dbo.InventoryCategory c ON c.InventoryCategoryId = inv.InventoryCategoryId
+LEFT JOIN dbo.InventorySubCategory sc ON sc.InventorySubCategoryId = inv.InventorySubCategoryId
+WHERE dp.DispatchId IN ({ph})
+GROUP BY dp.DispatchId, xr.InventoryId, inv.Number, inv.InventoryDesc,
+         inv.InventoryName, inv.NonPart,
+         c.InventoryCategoryName, sc.InventorySubCategoryName
+HAVING SUM(dp.Quantity) > 0
 """
 
 
@@ -80,3 +105,31 @@ def fetch_notes_for(conn, dispatch_ids):
                 "insert_dt": r["InsertDt"].isoformat() if r["InsertDt"] else None,
             })
     return notes
+
+
+def fetch_parts_for(conn, dispatch_ids):
+    """Recorded parts usage per dispatch, consumables included but flagged.
+    Returns {DISPATCH_ID: [{inventory_id, part_no, name, qty, consumable,
+    inv_cat, inv_subcat}, ...]}. Dispatches with no rows are simply absent —
+    callers store an explicit empty list to record "checked, none found".
+    """
+    parts = {}
+    cur = conn.cursor(as_dict=True)
+    CHUNK = 500
+    for i in range(0, len(dispatch_ids), CHUNK):
+        chunk = dispatch_ids[i:i + CHUNK]
+        placeholders = ",".join(["%s"] * len(chunk))
+        cur.execute(PARTS_SQL.format(ph=placeholders), tuple(chunk))
+        for r in cur.fetchall():
+            did = config.norm_guid(r["DispatchId"])
+            name = r["desc_short"] or r["inv_name"] or r["part_no"]
+            parts.setdefault(did, []).append({
+                "inventory_id": config.norm_guid(r["InventoryId"]) if r["InventoryId"] else "",
+                "part_no": r["part_no"],
+                "name": name,
+                "qty": float(r["qty"]),
+                "consumable": bool(r["NonPart"]),
+                "inv_cat": r["inv_cat"],
+                "inv_subcat": r["inv_subcat"],
+            })
+    return parts

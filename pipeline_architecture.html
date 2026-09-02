@@ -68,8 +68,8 @@
       <!-- Outputs (top-right, closes the loop) -->
       <rect x="860" y="40" width="250" height="120" rx="10" fill="none" stroke="var(--line)" stroke-width="1.8"/>
       <text x="985" y="83" text-anchor="middle" font-size="18" font-weight="700" fill="var(--ink)">Outputs</text>
-      <text x="985" y="108" text-anchor="middle" font-size="14" fill="var(--secondary)">case DB · ledger</text>
-      <text x="985" y="130" text-anchor="middle" font-size="13" fill="var(--muted)">Excel + growth chart</text>
+      <text x="985" y="108" text-anchor="middle" font-size="14" fill="var(--secondary)">Azure AI Search index</text>
+      <text x="985" y="130" text-anchor="middle" font-size="13" fill="var(--muted)">ledger · case DB (opt-in)</text>
 
       <!-- down arrow: Fetch & Exclude -> processing engine -->
       <line x1="469" y1="160" x2="469" y2="222" stroke="var(--line)" stroke-width="1.8" marker-end="url(#arrow)"/>
@@ -92,7 +92,7 @@
       <text x="195" y="537" text-anchor="middle" font-size="14" fill="var(--secondary)">sentences</text>
 
       <rect x="630" y="440" width="270" height="122" rx="10" fill="none" stroke="var(--accent-dup)" stroke-width="2.6"/>
-      <text x="765" y="469" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.03em" fill="var(--accent-dup)">STAGE C — see §2</text>
+      <text x="765" y="469" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.03em" fill="var(--accent-dup)">STAGE C · --with-cases only — see §2</text>
       <text x="765" y="494" text-anchor="middle" font-size="18.5" font-weight="700" fill="var(--ink)">Match or Create</text>
       <text x="765" y="517" text-anchor="middle" font-size="14" fill="var(--secondary)">embedding search</text>
       <text x="765" y="537" text-anchor="middle" font-size="14" fill="var(--secondary)">+ AI judge</text>
@@ -112,8 +112,18 @@
       <rect x="330" y="580" width="490" height="50" rx="8" fill="var(--surface)" stroke="var(--grid)" stroke-width="1.2"/>
       <text x="575" y="610" text-anchor="middle" font-size="13.5" fill="var(--secondary)">State saved to disk every 10 dispatches — safe to stop and resume at any point</text>
     </svg>
-    <figcaption>Figure 1. Data enters top-left, is staged, then flows down into a three-stage processing engine — classify, extract, match — before exiting up to the outputs on the right. Every stage's full batch finishes before the next stage starts, and progress is checkpointed continuously so the pipeline can be interrupted and resumed without reprocessing or losing work.</figcaption>
+    <figcaption>Figure 1. Data enters top-left, is staged, then flows down into the processing engine — classify, extract, and (only with <code>--with-cases</code>) match — before exiting up to the outputs on the right. Every stage's full batch finishes before the next stage starts, and progress is checkpointed continuously so the pipeline can be interrupted and resumed without reprocessing or losing work.</figcaption>
   </figure>
+
+  <p class="muted"><strong>Stage D — search indexing (the default exit path, both modes).</strong>
+  After extraction (and case-matching, when enabled), every dispatch with a non-empty root
+  cause is embedded (nomic-embed, 768-dim, shared cache) and upserted into the Azure AI Search
+  index <code>dispatches-nomic768-v1</code> together with its real recorded parts
+  (consumables excluded), which is what the Parts Finder queries at technician time. The fetch
+  step now also pulls recorded parts (<code>DispatchParts → InventoryLocationXREF →
+  Inventory</code>) into <code>state/parts.json</code>, so indexing needs no database access.
+  Terminal ledger statuses in the default mode are <code>indexed</code>, <code>no_fault</code>
+  (empty root cause, never indexed), and <code>no_useful_notes</code>.</p>
 
   <h2>2. How Stage C actually decides: match or create?</h2>
   <p class="muted">This is the mechanism that determines whether a dispatch is a duplicate of something already known, or introduces a genuinely new case.</p>
@@ -191,7 +201,7 @@
       <tr><td><code>N_CANDIDATES</code></td><td>5</td><td>how many similar cases get shown to the AI judge</td></tr>
       <tr><td><code>SIM_FLOOR</code></td><td>60%</td><td>minimum similarity before a case is even considered a candidate</td></tr>
       <tr><td><code>NOTE_CHUNK</code></td><td>20</td><td>notes per AI call in Stage A/B, to avoid oversized prompts</td></tr>
-      <tr><td><code>MAX_WORKERS</code></td><td>1</td><td>dispatches processed concurrently (kept low — see deployment notes)</td></tr>
+      <tr><td><code>MAX_WORKERS</code></td><td>8</td><td>dispatches processed concurrently (docs recommend 1 after gateway ReadTimeouts — see deployment notes; not re-verified at 8)</td></tr>
       <tr><td><code>CHECKPOINT_EVERY</code></td><td>10</td><td>dispatches between progress saves to disk</td></tr>
     </tbody>
   </table>
