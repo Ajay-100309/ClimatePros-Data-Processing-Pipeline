@@ -8,7 +8,7 @@ A standalone, resumable LLM data-mining pipeline that reads HVAC/refrigeration s
 
 This is its own git repo, nested in the ClimatePros workspace (the workspace `CLAUDE.md` one level up calls this project `Dispatch/` and describes the surrounding FieldJetX apps/APIs — this is the trimmed deployment cut of it; the legacy `main_*.py` one-shot scripts and audit tooling are deliberately not here).
 
-`README.md` is the operator-facing deployment guide and is accurate; `pipeline_architecture.html` is a standalone visual of the flow, the Stage C decision, and the thresholds. Module docstrings in `pipelib/*.py` are authoritative on behavior.
+`README.md` is the operator-facing deployment guide and is accurate; `pipeline_architecture.html` is a standalone visual of the flow, the Stage C decision, and the thresholds; `parts-finder-system-design.html` is the Parts Finder design doc whose measured numbers the `analysis/` suite reproduces. Module docstrings in `pipelib/*.py` are authoritative on behavior; `analysis/README.md` is authoritative on the analysis suite.
 
 ## Commands
 
@@ -30,6 +30,7 @@ venv/bin/python backfill_search.py --refresh-parts --force-push   # after --upda
 
 venv/bin/python reset_state.py --dry-run        # preview a cold start; changes nothing
 venv/bin/python reset_state.py --yes            # wipe progress, seed an empty catalog
+venv/bin/python reset_state.py --yes --cold     # same, and drop the embedding cache too
 venv/bin/python make_report.py                  # regenerate output/pipeline_report.html
 pip install -r requirements.txt                 # Python 3.12; venv/ is present but gitignored
 ```
@@ -90,3 +91,17 @@ The ledger is the "never process this again" set and holds only terminal outcome
 - GUIDs are normalized with `config.norm_guid` (upper, stripped) at every boundary; note IDs additionally strip internal spaces.
 - `RECEIVED_CUTOFF = "2026-07-01"` is hardcoded because the DB snapshot goes quiet after early June 2026.
 - Stage functions are idempotent by design: each skips items already present in its state file, which is what lets a re-run be a no-op rather than a duplicate.
+- `make_report.py` hardcodes `TOTAL_ELIGIBLE = 1_551_773` (eligible `dbo.Dispatch` rows under the pipeline's candidate filters, measured 2026-08-14) for its coverage figures — recompute via `db.CAND_SQL` wrapped in `COUNT(*)` if the DB snapshot is ever refreshed.
+
+## Analysis suite (`analysis/`) — the evidence behind the Parts Finder design
+
+Nine numbered scripts that reproduce every measured number in `parts-finder-system-design.html`. `analysis/README.md` is authoritative for setup, run order, and the reasoning trail of scripts 01–08; `09_azure_parity.py` postdates that README — it validates the **live** Azure index (leave-one-out hit@6 with the blended scoring formula, plus HNSW-vs-exact recall) and must run only after `backfill_search.py` has completed.
+
+```bash
+venv/bin/pip install -r analysis/requirements.txt   # adds numbers-parser + hnswlib
+venv/bin/python analysis/01_dispatch_reason_quality.py   # …through 09; run from the repo root
+```
+
+- All read-only: none touch FieldJetXStg or write into `state/`. The only gateway callers are `08_raw_vs_cleaned_embedding.py` (first run only; caches to the committed `analysis/raw_embed_cache.{json,npy}`) and 09's queries against Azure (needs `AZURE_SEARCH_*`; vectors come from the shared cache).
+- Scripts 03/04/06/07/08 read `dispatch_2k_rootcauses.numbers` / `case_parts_dataset.numbers` expected at the repo root — **those files are not in this repo** (they belong to the original project folder) and the scripts cannot run without them. 01/02/05/09 run from committed state/output alone.
+- `05_scale_benchmark.py`'s full run takes hours and holds its 1,551,773-vector HNSW index in memory only; `05_scale_benchmark_output_1551773.txt` is the saved log of the one real run the design's latency numbers come from.
