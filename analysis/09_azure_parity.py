@@ -1,5 +1,9 @@
 """09 — Azure AI Search parity check for the flat retrieval + blended scoring.
 
+SUPERSEDED by 10_rag_eval.py. load_corpus() crashes on corpora containing
+default-mode (casemap-less) batches; kept unmodified for provenance of the
+numbers cited in the design doc.
+
 Confirms the backfilled index reproduces the design's measured behavior, two ways:
 
 A) Leave-one-out hit@6 over every indexed dispatch that has real recorded parts:

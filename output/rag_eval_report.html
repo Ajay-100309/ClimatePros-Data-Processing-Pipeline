@@ -1,0 +1,63 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Parts Finder RAG Evaluation</title><style>
+body{font:14px/1.5 -apple-system,Segoe UI,sans-serif;margin:2rem auto;max-width:1100px;
+padding:0 1rem;color:#1a1a2e;background:#fff}
+h1{font-size:1.5rem} h2{font-size:1.15rem;margin-top:2.2rem;border-bottom:2px solid #114D9A;
+padding-bottom:.3rem} table{border-collapse:collapse;width:100%;margin:.8rem 0;font-size:13px}
+th,td{border:1px solid #d8dce6;padding:.35rem .6rem;text-align:left;vertical-align:middle}
+th{background:#f0f3f9} tr:nth-child(even) td{background:#fafbfd}
+.bar{position:relative;display:inline-block;width:180px;height:12px;background:#eef1f7;
+border-radius:6px;vertical-align:middle;margin-right:.5rem}
+.ci{position:absolute;top:2px;height:8px;background:#b9cdec;border-radius:4px}
+.pt{position:absolute;top:0;width:3px;height:12px;background:#114D9A;border-radius:2px}
+.v{white-space:nowrap} small{color:#667} .ok{color:#1a7f37} .warn{color:#b35900}
+.caveat{background:#fff8e6;border:1px solid #e6cf8b;border-radius:6px;padding:.8rem 1.2rem}
+footer{margin-top:2.5rem;color:#667;font-size:12px;border-top:1px solid #d8dce6;padding-top:.8rem}
+</style></head><body>
+<h1>Parts Finder RAG Evaluation</h1>
+<p>Index <b>dispatches-nomic768-v1</b> - 15,391 documents,
+2,606 with real recorded parts (731 distinct part numbers).
+Evaluated on <b>n=25</b> seeded leave-one-out queries shared by all arms.
+Scoring formula and constants mirror the production service
+(k=100, floor 0.55, lambda 0.1, top-6).</p>
+<div class="caveat"><b>What this eval is not:</b><ul><li>live LLM relevance gate (fail-open) is not replicated - this eval measures retrieval + scoring only</li><li>live popularity is a 6h-TTL facet query that can degrade to ({}, 0); eval uses the state snapshot with per-query leave-one-out correction</li><li>self- and same-text-twin exclusion is an eval artifact with no live counterpart</li><li>production blends popularity over supported parts only; blend_mode=inject (analysis/06/09 style) is reported for continuity</li></ul></div>
+
+<h2>Headline - hit@6 by query arm x retrieval variant (k=100, lambda=0.1)</h2>
+<p>Arm C (technician-style paraphrase, embedded fresh) is the realism headline;
+arm A is comparable to the original 44% design baseline; arm B is a documented lower bound.</p>
+<table><thead><tr><th>query arm</th><th>retrieval</th><th>n</th><th>hit@6 [95% CI]</th><th>hit@1</th><th>hit@3</th><th>hit@10</th><th>MRR</th><th>recall@6</th><th>retr.recall@100</th></tr></thead><tbody><tr><td>A - own doc vector (LOO)</td><td>vector</td><td>25</td><td><div class="bar"><div class="ci" style="left:26.7%;width:36.3%"></div><div class="pt" style="left:44.0%"></div></div><span class="v">44.0% <small>[26.7%-62.9%]</small></span></td><td>24.0%</td><td>36.0%</td><td>44.0%</td><td>0.315</td><td>38.7%</td><td>56.0%</td></tr><tr><td>A - own doc vector (LOO)</td><td>vector_hasparts</td><td>25</td><td><div class="bar"><div class="ci" style="left:30.0%;width:36.5%"></div><div class="pt" style="left:48.0%"></div></div><span class="v">48.0% <small>[30.0%-66.5%]</small></span></td><td>28.0%</td><td>36.0%</td><td>48.0%</td><td>0.339</td><td>40.7%</td><td>76.0%</td></tr><tr><td>A - own doc vector (LOO)</td><td>bm25</td><td>25</td><td><div class="bar"><div class="ci" style="left:23.4%;width:35.9%"></div><div class="pt" style="left:40.0%"></div></div><span class="v">40.0% <small>[23.4%-59.3%]</small></span></td><td>28.0%</td><td>36.0%</td><td>44.0%</td><td>0.341</td><td>34.7%</td><td>52.0%</td></tr><tr><td>B - raw reason field</td><td>vector</td><td>25</td><td><div class="bar"><div class="ci" style="left:6.4%;width:28.2%"></div><div class="pt" style="left:16.0%"></div></div><span class="v">16.0% <small>[6.4%-34.6%]</small></span></td><td>8.0%</td><td>16.0%</td><td>20.0%</td><td>0.126</td><td>10.7%</td><td>20.0%</td></tr><tr><td>B - raw reason field</td><td>vector_hasparts</td><td>25</td><td><div class="bar"><div class="ci" style="left:14.3%;width:33.3%"></div><div class="pt" style="left:28.0%"></div></div><span class="v">28.0% <small>[14.3%-47.6%]</small></span></td><td>12.0%</td><td>16.0%</td><td>36.0%</td><td>0.179</td><td>21.3%</td><td>56.0%</td></tr><tr><td>B - raw reason field</td><td>bm25</td><td>25</td><td><div class="bar"><div class="ci" style="left:11.5%;width:31.9%"></div><div class="pt" style="left:24.0%"></div></div><span class="v">24.0% <small>[11.5%-43.4%]</small></span></td><td>20.0%</td><td>20.0%</td><td>24.0%</td><td>0.207</td><td>19.3%</td><td>28.0%</td></tr><tr><td>C - technician paraphrase</td><td>vector</td><td>25</td><td><div class="bar"><div class="ci" style="left:26.7%;width:36.3%"></div><div class="pt" style="left:44.0%"></div></div><span class="v">44.0% <small>[26.7%-62.9%]</small></span></td><td>24.0%</td><td>40.0%</td><td>52.0%</td><td>0.326</td><td>36.7%</td><td>56.0%</td></tr><tr><td>C - technician paraphrase</td><td>vector_hasparts</td><td>25</td><td><div class="bar"><div class="ci" style="left:26.7%;width:36.3%"></div><div class="pt" style="left:44.0%"></div></div><span class="v">44.0% <small>[26.7%-62.9%]</small></span></td><td>28.0%</td><td>32.0%</td><td>52.0%</td><td>0.334</td><td>38.7%</td><td>76.0%</td></tr><tr><td>C - technician paraphrase</td><td>bm25</td><td>25</td><td><div class="bar"><div class="ci" style="left:26.7%;width:36.3%"></div><div class="pt" style="left:44.0%"></div></div><span class="v">44.0% <small>[26.7%-62.9%]</small></span></td><td>28.0%</td><td>32.0%</td><td>48.0%</td><td>0.335</td><td>38.7%</td><td>60.0%</td></tr></tbody></table>
+
+<h2>Baselines</h2>
+<table><thead><tr><th>baseline</th><th>n</th><th>hit@6 [95% CI]</th></tr></thead><tbody><tr><td>random@6</td><td>25</td><td><div class="bar"><div class="ci" style="left:0.0%;width:13.3%"></div><div class="pt" style="left:0.0%"></div></div><span class="v">0.0% <small>[0.0%-13.3%]</small></span></td></tr><tr><td>popularity_only@6</td><td>25</td><td><div class="bar"><div class="ci" style="left:20.2%;width:35.2%"></div><div class="pt" style="left:36.0%"></div></div><span class="v">36.0% <small>[20.2%-55.5%]</small></span></td></tr><tr><td>plain_freq_agg@6 (A/vector, k=100)</td><td>25</td><td><div class="bar"><div class="ci" style="left:26.7%;width:36.3%"></div><div class="pt" style="left:44.0%"></div></div><span class="v">44.0% <small>[26.7%-62.9%]</small></span></td></tr></tbody></table>
+
+<h2>Sensitivity - arm A hit@6 across k and lambda (blend=supported)</h2>
+<table><thead><tr><th>variant</th><th>k</th><th>lambda=0.0</th><th>lambda=0.05</th><th>lambda=0.1</th><th>lambda=0.2</th><th>lambda=0.4</th></tr></thead><tbody><tr><td>vector</td><td>10</td><td>28.0%</td><td>28.0%</td><td>28.0%</td><td>28.0%</td><td>28.0%</td></tr><tr><td>vector</td><td>50</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td></tr><tr><td>vector</td><td>100</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td></tr><tr><td>vector</td><td>200</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td></tr><tr><td>vector_hasparts</td><td>10</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>44.0%</td></tr><tr><td>vector_hasparts</td><td>50</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td></tr><tr><td>vector_hasparts</td><td>100</td><td>48.0%</td><td>48.0%</td><td>48.0%</td><td>48.0%</td><td>48.0%</td></tr><tr><td>vector_hasparts</td><td>200</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td></tr><tr><td>bm25</td><td>10</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td></tr><tr><td>bm25</td><td>50</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td><td>44.0%</td></tr><tr><td>bm25</td><td>100</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td><td>40.0%</td></tr><tr><td>bm25</td><td>200</td><td>40.0%</td><td>36.0%</td><td>36.0%</td><td>40.0%</td><td>40.0%</td></tr></tbody></table>
+
+<h2>Failure decomposition (k=100, lambda=0.1)</h2>
+<p>retrieval_miss: no retrieved neighbor held a true part - below_floor: evidence
+retrieved but under the 0.55 cosine floor - scorer_misrank: evidence above
+the floor but the true part missed the top-6.</p>
+<table><thead><tr><th>arm/variant</th><th>hit</th><th>retrieval miss</th><th>below floor</th><th>scorer misrank</th></tr></thead><tbody><tr><td>A/vector</td><td>44.0%</td><td>44.0%</td><td>0.0%</td><td>12.0%</td></tr><tr><td>A/vector_hasparts</td><td>48.0%</td><td>24.0%</td><td>0.0%</td><td>28.0%</td></tr><tr><td>A/bm25</td><td>40.0%</td><td>48.0%</td><td>0.0%</td><td>12.0%</td></tr><tr><td>B/vector</td><td>16.0%</td><td>80.0%</td><td>0.0%</td><td>4.0%</td></tr><tr><td>B/vector_hasparts</td><td>28.0%</td><td>44.0%</td><td>4.0%</td><td>24.0%</td></tr><tr><td>B/bm25</td><td>24.0%</td><td>72.0%</td><td>4.0%</td><td>0.0%</td></tr><tr><td>C/vector</td><td>44.0%</td><td>44.0%</td><td>4.0%</td><td>8.0%</td></tr><tr><td>C/vector_hasparts</td><td>44.0%</td><td>24.0%</td><td>4.0%</td><td>28.0%</td></tr><tr><td>C/bm25</td><td>44.0%</td><td>40.0%</td><td>0.0%</td><td>16.0%</td></tr></tbody></table>
+
+<h2>Per-category (arm A / vector, categories with n>=10)</h2>
+<table><thead><tr><th>category</th><th>n</th><th>hit@6</th></tr></thead><tbody></tbody></table>
+
+<h2>Part-popularity tiers (arm A / vector)</h2>
+<p>head = a truth part in the 10 most-used parts; tail = none in the top 100.
+The exclusion row answers "is it just predicting the most common parts?"</p>
+<table><thead><tr><th>tier</th><th>n</th><th>hit@6</th></tr></thead><tbody><tr><td>head</td><td>11</td><td>81.8%</td></tr><tr><td>mid</td><td>7</td><td>28.6%</td></tr><tr><td>tail</td><td>7</td><td>0.0%</td></tr><tr><td>(hit@6 excluding head-tier truths)</td><td>14</td><td>14.3%</td></tr></tbody></table>
+
+<h2>LLM-judged context relevance</h2>
+<p>n=3 queries x top-10 contexts (arm A / vector). Context precision@10: <b>53.3%</b> strict (same failure), <b>86.7%</b> lenient (same or related). Failed judge calls: 0.</p><table><thead><tr><th>cosine band</th><th>n contexts</th><th>same</th><th>related</th><th>unrelated</th></tr></thead><tbody><tr><td>0.75-0.85</td><td>11</td><td>18.2%</td><td>54.5%</td><td>27.3%</td></tr><tr><td>0.85-1.00</td><td>19</td><td>73.7%</td><td>21.1%</td><td>5.3%</td></tr></tbody></table>
+
+<h2>Paired comparisons (hit@6, k=100, lambda=0.1)</h2>
+<table><thead><tr><th>A</th><th>B</th><th>n pairs</th><th>delta (A-B)</th><th>bootstrap 95% CI</th><th>McNemar p</th></tr></thead><tbody><tr><td>A/vector</td><td>A/vector_hasparts</td><td>25</td><td>-4.0%</td><td>[-12.0%, +0.0%]</td><td>1.0000</td></tr><tr><td>A/vector</td><td>A/bm25</td><td>25</td><td>+4.0%</td><td>[+0.0%, +12.0%]</td><td>1.0000</td></tr><tr><td>A/vector</td><td>C/vector</td><td>25</td><td>+0.0%</td><td>[+0.0%, +0.0%]</td><td>1.0000</td></tr><tr><td>B/vector</td><td>C/vector</td><td>25</td><td>-28.0%</td><td>[-48.0%, -12.0%]</td><td>0.0156</td></tr></tbody></table>
+
+<h2>Production-scorer parity</h2>
+<p class="ok">25/25 sampled queries produce an identical top-6 to the production scorer (TechJays build_suggestions).</p>
+
+<footer>Generated 2026-09-10T06:43:07.648520+00:00 - pipeline a689522
+/ techjays 49a213c - seeds {"queries": 4242, "judge": 4243, "bootstrap": 4244, "random_baseline": 4245}
+- sample ids sha b82e984f95078057
+- machine-readable scores: output/eval_scores.json</footer>
+</body></html>
