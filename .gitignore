@@ -2,3 +2,10 @@
 .DS_Store
 __pycache__/
 venv/
+# bulk state — too large for GitHub (100 MB blob limit); sync via ./sync_state.sh
+state/embeddings.npy
+state/embeddings_index.json
+state/dispatch_meta.json
+state/batch_current.json
+state/batches/
+analysis/eval_cache/full_run.log

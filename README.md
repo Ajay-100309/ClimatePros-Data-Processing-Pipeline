@@ -42,7 +42,10 @@ prompt_casemap.txt        Stage C prompt (case-matching judge)
 requirements.txt          Python dependencies
 state/                    existing progress — ledger, case registry, checkpoints,
                           recorded parts (parts.json), search push record
-                          (search_index.json) (KEEP)
+                          (search_index.json) (KEEP). NOTE: embeddings.npy,
+                          embeddings_index.json, dispatch_meta.json and batches/
+                          are too large for GitHub and are NOT in git — move them
+                          with ./sync_state.sh (see below)
 output/chroma_cases_extracted/   existing vector database of the cases (KEEP)
 output/part_popularity.json      part-usage prior over the indexed corpus (regenerated)
 analysis/                 the evaluation scripts behind the Parts Finder design numbers
@@ -81,7 +84,9 @@ run this pipeline or produce the case-growth report.
    enforced by the commands that push documents — `--stats`, `make_report.py`, and
    `reset_state.py` work without them.
 
-3. **Copy `state/` and `output/chroma_cases_extracted/` into place** exactly as provided —
+3. **Copy `state/` and `output/chroma_cases_extracted/` into place** exactly as provided
+   (for the git-tracked part a clone suffices; pull the untracked bulk files with
+   `./sync_state.sh pull user@host` from a machine that has them) —
    these two must stay in sync with each other. If they ever get out of sync (e.g. one was
    restored from an older backup than the other), the pipeline will detect a mismatch on
    startup and refuse to run rather than silently corrupt the case catalog.
