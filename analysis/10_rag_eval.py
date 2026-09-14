@@ -43,6 +43,7 @@ os.environ.setdefault("MKL_NUM_THREADS", "1")
 import sys
 import json
 import math
+import time
 import random
 import argparse
 import hashlib
@@ -91,6 +92,22 @@ DIVERGENCES = [
     "self- and same-text-twin exclusion is an eval artifact with no live counterpart",
     "production blends popularity over supported parts only; blend_mode=inject (analysis/06/09 style) is reported for continuity",
 ]
+
+
+def azure_retry(fn, attempts=6, base=5):
+    """Azure transient-error retry (RemoteDisconnected etc.). Wraps both the
+    call and the lazy result materialization — the SDK raises mid-iteration."""
+    from azure.core.exceptions import AzureError
+    for a in range(1, attempts + 1):
+        try:
+            return fn()
+        except AzureError as e:
+            if a == attempts:
+                raise
+            wait = base * a
+            print(f"  Azure error ({type(e).__name__}: {str(e)[:80]}), "
+                  f"retry {a}/{attempts} in {wait}s...")
+            time.sleep(wait)
 
 
 def norm_part(p):
@@ -179,7 +196,7 @@ class Corpus:
         if cm and config.text_sha(cm) == sha:
             return cm
         if client is not None:
-            return client.get_document(key=did)["rootCause"]
+            return azure_retry(lambda: client.get_document(key=did))["rootCause"]
         return rc or cm  # best local effort
 
 
@@ -430,21 +447,25 @@ def phase_retrieve(corpus, dids, arms, variants, ec, paraphrases):
                 kwargs = dict(select=["dispatchId"], top=K_RETRIEVE)
                 if variant == "vector_hasparts":
                     kwargs["filter"] = "hasParts eq true"
-                if variant == "bm25":
-                    qtext = text if arm != "A" else corpus.indexed_text(did, client)
-                    results = client.search(search_text=qtext,
-                                            search_fields=["rootCause"], **kwargs)
-                else:
-                    results = client.search(
-                        search_text=None,
-                        vector_queries=[VectorizedQuery(
-                            vector=[float(x) for x in vec],
-                            k_nearest_neighbors=K_RETRIEVE,
-                            fields="rootCauseVector")],
-                        **kwargs)
-                state["results"][did] = [
-                    [corpus.did_ix[r["dispatchId"]], round(float(r["@search.score"]), 6)]
-                    for r in results if r["dispatchId"] in corpus.did_ix]
+
+                def run_query():
+                    if variant == "bm25":
+                        qtext = text if arm != "A" else corpus.indexed_text(did, client)
+                        results = client.search(search_text=qtext,
+                                                search_fields=["rootCause"], **kwargs)
+                    else:
+                        results = client.search(
+                            search_text=None,
+                            vector_queries=[VectorizedQuery(
+                                vector=[float(x) for x in vec],
+                                k_nearest_neighbors=K_RETRIEVE,
+                                fields="rootCauseVector")],
+                            **kwargs)
+                    return [[corpus.did_ix[r["dispatchId"]],
+                             round(float(r["@search.score"]), 6)]
+                            for r in results if r["dispatchId"] in corpus.did_ix]
+
+                state["results"][did] = azure_retry(run_query)
                 n_calls += 1
                 if i % 100 == 0 or i == len(todo):
                     save_json(path, state)

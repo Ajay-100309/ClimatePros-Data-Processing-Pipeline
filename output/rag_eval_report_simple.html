@@ -1,0 +1,136 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Parts Finder AI - Evaluation Summary (Plain Language)</title><style>
+body{font:15px/1.65 -apple-system,Segoe UI,sans-serif;margin:2rem auto;max-width:880px;
+padding:0 1.2rem;color:#1a1a2e;background:#fff}
+h1{font-size:1.6rem;line-height:1.3} h2{font-size:1.2rem;margin-top:2.4rem;color:#114D9A}
+p,li{max-width:72ch}
+table{border-collapse:collapse;margin:1rem 0;font-size:14px;width:100%}
+th,td{border:1px solid #d8dce6;padding:.45rem .7rem;text-align:left}
+th{background:#f0f3f9} tr:nth-child(even) td{background:#fafbfd}
+.big{font-size:2.6rem;font-weight:700;color:#114D9A;line-height:1.1}
+.scorebox{display:flex;gap:1.5rem;flex-wrap:wrap;margin:1.2rem 0}
+.card{flex:1 1 200px;border:1px solid #d8dce6;border-radius:8px;padding:1rem 1.2rem;background:#fafbfd}
+.card small{color:#556}
+.bar{height:18px;background:#eef1f7;border-radius:9px;overflow:hidden;margin:.3rem 0 .1rem}
+.fill{height:100%;background:#114D9A;border-radius:9px}
+.fill.grey{background:#9aa7bd} .fill.red{background:#c0564f} .fill.green{background:#2e8b57}
+.good{border-left:4px solid #2e8b57;padding:.6rem 1rem;background:#f2f9f4;border-radius:0 6px 6px 0;margin:.8rem 0}
+.bad{border-left:4px solid #c0564f;padding:.6rem 1rem;background:#fdf4f3;border-radius:0 6px 6px 0;margin:.8rem 0}
+.note{background:#fff8e6;border:1px solid #e6cf8b;border-radius:6px;padding:.8rem 1.2rem;margin:1rem 0}
+footer{margin-top:3rem;color:#667;font-size:12px;border-top:1px solid #d8dce6;padding-top:.8rem}
+</style></head><body>
+
+<h1>How good is the Parts Finder AI?<br><small style="font-size:1rem;font-weight:400;color:#556">
+A plain-language summary of the September 2026 evaluation</small></h1>
+
+<h2>What this system does</h2>
+<p>When a technician finishes diagnosing a broken unit, they type what they found into the
+mobile app - something like <i>"bad condenser fan motor"</i>. The AI then searches a library of
+<b>15,391 past service jobs</b>, finds the ones that describe the most similar problem, looks at
+which parts were actually used to fix those jobs, and suggests up to <b>6 parts</b> the technician
+will probably need. Think of it as a colleague who remembers every job the company has ever done.</p>
+
+<h2>How we tested it</h2>
+<p>We took <b>1,000 past jobs where we already know which parts were really used</b>. For each
+one, we hid the answer, showed the AI only the problem description, and checked: did any of
+the parts the technician <i>actually used</i> appear in the AI's top-6 suggestions?</p>
+<p>We asked the question three different ways, because how you phrase it matters:</p>
+<table>
+<tr><th>Phrasing</th><th>Example</th><th>Why we tested it</th></tr>
+<tr><td><b>A. Full write-up</b></td><td>"Disassembled and found one of two condenser fan motors is bad."</td><td>The cleanest possible question - our benchmark</td></tr>
+<tr><td><b>B. Raw ticket text</b></td><td>"12926703 - Severity 3 - Created 05/18... NTE: 1250..."</td><td>What happens if someone lazily pastes the work order</td></tr>
+<tr><td><b>C. Short tech phrase</b></td><td>"bad condenser fan motor replaced"</td><td>What a real technician will actually type on a phone</td></tr>
+</table>
+<p>On top of that, a second, independent AI reviewed a sample of 200 searches and graded
+whether each past job the system pulled up was genuinely about the same problem - a
+quality check on the search itself, not just the final answer.</p>
+
+<h2>The main result</h2>
+<div class="scorebox">
+<div class="card"><div class="big">52%</div>of jobs get at least one correct part in the top-6 suggestions<br>
+<small>(between 49% and 55% - tested on 1,000 jobs)</small></div>
+<div class="card"><div class="big">33%</div>what you'd score by <i>always</i> suggesting the 6 most commonly used parts<br>
+<small>the "no AI" shortcut</small></div>
+<div class="card"><div class="big">~1%</div>what random guessing scores<br>
+<small>there are 731 possible parts</small></div>
+</div>
+<p>So the AI finds a right part roughly <b>every second job</b>, clearly beating the best
+non-AI shortcut. About 1 in 4 jobs has a correct part in the <b>very first</b> suggestion.</p>
+
+<h2>The good news</h2>
+<div class="good"><b>Typing a short phrase works just as well as writing full sentences.</b>
+The short technician phrasing scored 52% - statistically identical to the perfect write-up.
+The mobile app's simple free-text box is the right design; technicians don't need to write essays.</div>
+<div class="good"><b>The math behind the ranking is already as good as it can get.</b> We tried
+every variation of the scoring recipe (how many past jobs to look at, how much weight to give
+popular parts, different weighting formulas) - they all land within 1 point of each other. We also
+confirmed, on 50 sampled jobs, that this evaluation's calculations match the live service's code
+exactly, suggestion for suggestion.</div>
+<div class="good"><b>The search quality filter works.</b> The judge AI confirmed that 81% of what
+the system retrieves is at least a related problem, and that matches below the system's similarity
+cutoff are mostly junk (64% unrelated) - exactly what the cutoff is there to remove.</div>
+
+<h2>The honest weak spots</h2>
+<div class="bad"><b>Raw ticket text ruins the results - 52% drops to 28%.</b> The work-order text is
+full of tracking numbers, dates and billing codes that confuse the search. The app must always
+ask the technician what they found, and never fall back to the ticket description. (The app is
+already built this way - this test proves why it must stay that way.)</div>
+<div class="bad"><b>The AI is great at common parts and nearly blind to rare ones.</b> When the
+needed part is one of the 10 most-used parts, it scores 87%. When it's a rarely-used part, it
+scores just 7%. In other words, the AI is strongest exactly where an experienced tech needs
+the least help. This isn't a flaw in the math - rare parts simply have too few past examples.</div>
+<div class="bad"><b>The library is still too small - that's the real ceiling.</b> In 1 out of 3 test
+jobs, <i>no</i> past job in the library used the right part and described a similar problem, so no
+scoring formula could have found it. Today only 2,606 of the 15,391 indexed jobs have parts
+recorded against them.</div>
+
+<h2>Results by problem type</h2>
+<p>Some problems are much easier for the AI than others (share of jobs with a correct part in the top 6):</p>
+<table>
+<tr><th>Problem type</th><th>Jobs tested</th><th>Score</th><th></th></tr>
+<tr><td>Coil failure</td><td>25</td><td>60%</td><td><div class="bar" style="width:180px"><div class="fill" style="width:60%"></div></div></td></tr>
+<tr><td>Compressor failure</td><td>73</td><td>45%</td><td><div class="bar" style="width:180px"><div class="fill" style="width:45%"></div></div></td></tr>
+<tr><td>Fan motor failure</td><td>198</td><td>42%</td><td><div class="bar" style="width:180px"><div class="fill" style="width:42%"></div></div></td></tr>
+<tr><td>Contactor failure</td><td>54</td><td>39%</td><td><div class="bar" style="width:180px"><div class="fill" style="width:39%"></div></div></td></tr>
+<tr><td>Control board failure</td><td>33</td><td>21%</td><td><div class="bar" style="width:180px"><div class="fill grey" style="width:21%"></div></div></td></tr>
+<tr><td>Drain blockage</td><td>29</td><td>17%</td><td><div class="bar" style="width:180px"><div class="fill grey" style="width:17%"></div></div></td></tr>
+<tr><td>Electrical wiring</td><td>16</td><td>6%</td><td><div class="bar" style="width:180px"><div class="fill red" style="width:6%"></div></div></td></tr>
+</table>
+<p>This pattern makes sense: fan motors and compressors fail the same way everywhere, so past
+examples transfer well. Wiring problems and drain blockages are one-of-a-kind and often need
+no stocked part at all.</p>
+
+<h2>What should happen next</h2>
+<ol>
+<li><b>Keep growing the library.</b> Every batch of processed dispatches adds searchable history,
+and history - not smarter math - is what raises the score. Jobs with recorded parts are worth
+the most; today only ~17% of indexed jobs have any.</li>
+<li><b>Re-run this evaluation after major growth.</b> It is one command
+(<code>venv/bin/python analysis/10_rag_eval.py</code>) and reuses everything already computed,
+so a refresh takes minutes, not hours.</li>
+<li><b>No scoring changes needed.</b> The current live configuration (look at 100 similar jobs,
+small popularity bonus) is confirmed as good as any alternative we measured.</li>
+</ol>
+
+<div class="note"><b>What this test did not cover:</b> the live service also runs a gatekeeper AI
+that rejects nonsense input (e.g. random letters) before searching - that gate wasn't part of this
+test. And the scores above measure suggestions against the parts technicians <i>recorded</i> -
+where past technicians forgot to log parts, a "correct" suggestion can still be counted as a miss,
+so the true usefulness is, if anything, slightly better than these numbers.</div>
+
+<h2>Mini glossary</h2>
+<table>
+<tr><th>Term you might hear</th><th>Plain meaning</th></tr>
+<tr><td>hit@6</td><td>"Was at least one truly-used part inside the top 6 suggestions?" - our main score</td></tr>
+<tr><td>Retrieval</td><td>The step where the system finds similar past jobs to learn from</td></tr>
+<tr><td>Embedding / vector search</td><td>The technique that lets the system match problems by <i>meaning</i>, not exact words - "comp trip" can match "compressor safety lockout"</td></tr>
+<tr><td>49%-55% range</td><td>If we repeated the test with a different 1,000 jobs, the score would land in this range - the honest margin of error</td></tr>
+<tr><td>Leave-one-out</td><td>Each test job was hidden from the library while being tested, so the AI could never "cheat" by finding the job itself</td></tr>
+</table>
+
+<footer>Evaluated 10 September 2026 on search index <b>dispatches-nomic768-v1</b>
+(15,391 jobs, 2,606 with recorded parts, 731 distinct parts) - 1,000 test jobs, all phrasings
+tested on the same jobs for a fair comparison.<br>
+Full technical companion: <code>output/rag_eval_report.html</code> - raw numbers:
+<code>output/eval_scores.json</code> - test harness: <code>analysis/10_rag_eval.py</code></footer>
+</body></html>
