@@ -11,15 +11,22 @@ cd "$(dirname "$0")"
 MODE="${1:?usage: sync_state.sh pull|push user@host [remote_repo_path]}"
 REMOTE="${2:?usage: sync_state.sh pull|push user@host [remote_repo_path]}"
 RPATH="${3:-techjays/ClimatePros-Data-Processing-Pipeline}"
-FILES=(state/embeddings.npy state/embeddings_index.json state/dispatch_meta.json)
+# batch_current.json is the staged work order: fetch on one machine, sync, then
+# process on another. Missing files are skipped (e.g. no batch in flight).
+FILES=(state/embeddings.npy state/embeddings_index.json state/dispatch_meta.json
+       state/batch_current.json)
 mkdir -p state/batches
 case "$MODE" in
   pull)
-    for f in "${FILES[@]}"; do rsync -av "$REMOTE:$RPATH/$f" "$f"; done
+    for f in "${FILES[@]}"; do
+      rsync -av "$REMOTE:$RPATH/$f" "$f" || echo "  (skipped $f — not on remote)"
+    done
     rsync -av "$REMOTE:$RPATH/state/batches/" state/batches/
     ;;
   push)
-    for f in "${FILES[@]}"; do rsync -av "$f" "$REMOTE:$RPATH/$f"; done
+    for f in "${FILES[@]}"; do
+      [ -f "$f" ] && rsync -av "$f" "$REMOTE:$RPATH/$f" || echo "  (skipped $f — not present locally)"
+    done
     rsync -av state/batches/ "$REMOTE:$RPATH/state/batches/"
     ;;
   *) echo "unknown mode: $MODE (use pull|push)" >&2; exit 1 ;;
