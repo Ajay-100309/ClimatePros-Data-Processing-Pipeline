@@ -19,13 +19,18 @@ mkdir -p state/batches
 case "$MODE" in
   pull)
     for f in "${FILES[@]}"; do
-      rsync -av "$REMOTE:$RPATH/$f" "$f" || echo "  (skipped $f — not on remote)"
+      rsync -av "$REMOTE:$RPATH/$f" "$f" \
+        || { [ $? -eq 23 ] && echo "  (skipped $f — not on remote)" || exit 1; }
     done
     rsync -av "$REMOTE:$RPATH/state/batches/" state/batches/
     ;;
   push)
     for f in "${FILES[@]}"; do
-      [ -f "$f" ] && rsync -av "$f" "$REMOTE:$RPATH/$f" || echo "  (skipped $f — not present locally)"
+      if [ -f "$f" ]; then
+        rsync -av "$f" "$REMOTE:$RPATH/$f"   # a failure here aborts loudly (set -e)
+      else
+        echo "  (skipped $f — not present locally)"
+      fi
     done
     rsync -av state/batches/ "$REMOTE:$RPATH/state/batches/"
     ;;
