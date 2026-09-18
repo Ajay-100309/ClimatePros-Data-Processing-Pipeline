@@ -43,6 +43,8 @@ def main():
     ap.add_argument("--with-cases", action="store_true",
                     help="also run Stage C case-mapping and regenerate the "
                          "case reports (legacy default)")
+    ap.add_argument("--chunk-size", type=int, default=None, metavar="N",
+                    help="dispatches per A->B->D slice (default 500 from config.PROCESS_CHUNK); the search index is updated after each slice. 0 runs each stage over the whole batch")
     args = ap.parse_args()
 
     if args.stats:
@@ -62,7 +64,8 @@ def main():
         if args.dry_run:
             return
 
-    runner.process(batch, with_cases=args.with_cases)
+    runner.process(batch, with_cases=args.with_cases,
+                   chunk_size=args.chunk_size)
 
 
 if __name__ == "__main__":

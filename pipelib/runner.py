@@ -7,6 +7,10 @@ DB. Nothing else crosses the boundary, so the halves can run as separate
 commands, on separate schedules, or from hosts with different network access —
 as long as they share the same state/ directory.
 
+process() works through the batch in slices (config.PROCESS_CHUNK), running
+A -> B -> D per slice, so documents reach the search index throughout a long
+run rather than only after every dispatch has been extracted.
+
 Two process modes share the A/B stages:
 - default (parts-finder indexing): A -> B -> Stage D (embed + push to Azure AI
   Search). Terminal ledger statuses: indexed, no_fault, no_useful_notes. The
@@ -75,23 +79,66 @@ def fetch(count, dry_run=False, month=None):
     return stage_fetch.stage_batch(count, dry_run=dry_run, month=month)
 
 
-def process(batch, with_cases=False):
-    """Run stages A/B (+C with --with-cases) then Stage D, and finalize."""
+def _slices(dispatches, size):
+    """The batch split into A->B->D passes. An empty batch still yields one
+    (empty) slice so the stages run once and hand back their global state."""
+    if not size or size >= len(dispatches):
+        return [dispatches] if dispatches else [[]]
+    return [dispatches[i:i + size] for i in range(0, len(dispatches), size)]
+
+
+def process(batch, with_cases=False, chunk_size=None):
+    """Run stages A/B (+C with --with-cases) then Stage D, and finalize.
+
+    The batch is processed in slices of `chunk_size` (config.PROCESS_CHUNK by
+    default): each slice goes A -> B -> (C) -> D before the next one starts, so
+    a long run keeps feeding the search index instead of pushing everything
+    only after the last dispatch is extracted. Results are identical either
+    way — every stage is keyed globally by dispatch id and skips what it has
+    already done — so the slice size is purely about when documents land.
+    Pass chunk_size=0 to run each stage over the whole batch, as before.
+    """
     statefiles.ensure_dirs()
     check_state(with_cases)
     if not with_cases:
         # Stage D is the only reason this mode runs — refuse before LLM spend
         config.require_search_config()
 
-    notes_state = stage_notes.run(batch)
-    useful = stage_notes.useful_notes(batch, notes_state)
-    print(f"Useful-note dispatches: {sum(1 for v in useful.values() if v)}; "
-          f"zero-useful: {sum(1 for v in useful.values() if not v)}")
+    size = config.PROCESS_CHUNK if chunk_size is None else chunk_size
+    chunks = _slices(batch["dispatches"], size)
+    total = len(batch["dispatches"])
+    if len(chunks) > 1:
+        print(f"Processing {total} dispatches in {len(chunks)} slices of "
+              f"up to {size} — the search index is updated after each.")
 
-    extract_state = stage_extract.run(batch, useful)
-    casemap_state = (stage_casemap.run(batch, extract_state, useful)
-                     if with_cases else None)
-    index_state = stage_index.run(batch, extract_state, useful)
+    notes_state = extract_state = index_state = casemap_state = None
+    done = 0
+    for i, chunk in enumerate(chunks, 1):
+        sub = dict(batch, dispatches=chunk)
+        if len(chunks) > 1:
+            print(f"\n{'=' * 62}\n=== Slice {i}/{len(chunks)}: dispatches "
+                  f"{done + 1}-{done + len(chunk)} of {total}\n{'=' * 62}")
+
+        notes_state = stage_notes.run(sub)
+        useful = stage_notes.useful_notes(sub, notes_state)
+        print(f"Useful-note dispatches: {sum(1 for v in useful.values() if v)}; "
+              f"zero-useful: {sum(1 for v in useful.values() if not v)}")
+
+        extract_state = stage_extract.run(sub, useful)
+        # Stage C stays strictly sequential: slices run in order, and within a
+        # slice a case minted for dispatch n is visible to dispatch n+1.
+        casemap_state = (stage_casemap.run(sub, extract_state, useful)
+                         if with_cases else None)
+        index_state = stage_index.run(sub, extract_state, useful)
+
+        done += len(chunk)
+        if len(chunks) > 1:
+            # keep the popularity prior coherent with the index mid-run, so a
+            # killed run leaves the two consistent rather than skewed
+            stage_index.write_popularity(index_state)
+            print(f"--- Slice {i}/{len(chunks)} complete: {done}/{total} dispatches "
+                  f"through the pipeline; index holds "
+                  f"{len(index_state['pushed'])} documents. ---")
 
     finalize(batch, notes_state, extract_state, index_state, casemap_state)
 

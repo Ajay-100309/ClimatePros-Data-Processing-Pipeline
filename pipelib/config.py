@@ -68,6 +68,11 @@ SIM_FLOOR = 0.60
 NOTE_CHUNK = 20
 MAX_WORKERS = 8
 CHECKPOINT_EVERY = 10
+# Dispatches per A->B->D pass. The batch is processed in slices so documents
+# reach the search index throughout a long run instead of only at the end;
+# 500 matches SEARCH_UPLOAD_BATCH, so each slice is one upload call. 0 = run
+# the whole batch through each stage before moving on (pre-chunking behavior).
+PROCESS_CHUNK = 500
 
 # DB snapshot goes quiet after early June 2026; the proven sample cutoff
 RECEIVED_MIN = "2013-01-01"
