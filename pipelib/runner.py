@@ -60,8 +60,11 @@ def stats():
               f"({len(staged['dispatches'])} dispatches)")
 
 
-def fetch(count, dry_run=False):
+def fetch(count, dry_run=False, month=None):
     """Stage the next `count` never-processed dispatches as the work order.
+
+    With `month="YYYY-MM"`, selects from that month and spreads the picks
+    evenly across it instead of taking the newest.
 
     Returns the staged batch, or None for a dry run. Nothing is marked
     processed here — a staged batch that is never processed only leaves its
@@ -69,7 +72,7 @@ def fetch(count, dry_run=False):
     """
     statefiles.ensure_dirs()
     check_state()
-    return stage_fetch.stage_batch(count, dry_run=dry_run)
+    return stage_fetch.stage_batch(count, dry_run=dry_run, month=month)
 
 
 def process(batch, with_cases=False):
