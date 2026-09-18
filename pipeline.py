@@ -30,6 +30,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--count", type=int, help="dispatches to process this batch")
+    ap.add_argument("--month", metavar="YYYY-MM",
+                    help="fetch from this month, spread evenly across it "
+                         "(default: newest-first). Multi-month planning lives "
+                         "in fetch.py --plan-months / --next-month")
     ap.add_argument("--dry-run", action="store_true",
                     help="fetch + exclusion report only; nothing written")
     ap.add_argument("--skip-fetch", action="store_true",
@@ -54,7 +58,7 @@ def main():
     else:
         if not args.count:
             sys.exit("--count N is required (or --skip-fetch / --stats).")
-        batch = runner.fetch(args.count, dry_run=args.dry_run)
+        batch = runner.fetch(args.count, dry_run=args.dry_run, month=args.month)
         if args.dry_run:
             return
 

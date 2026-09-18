@@ -131,6 +131,25 @@ Each indexed part carries `unitedPartNo` — United Refrigeration's own catalog 
 resolved from `InventorySupplierXREF` (active United suppliers only, false self-referencing
 cross-references excluded; empty when the item has no United mapping).
 
+### Covering more than the newest months
+
+Plain `--count N` takes the newest unprocessed dispatches, which concentrates the
+corpus in the last few months and hides seasonal failures (heating, defrost, freeze-ups).
+To spread collection across months instead:
+
+```
+python fetch.py --plan-months --per-month 5000 --months 24   # budget 24 months (~2 min of counting)
+python fetch.py --show-plan                                  # per-month quotas and progress
+python fetch.py --next-month                                 # stage the oldest month still short
+python fetch.py --month 2025-02 --count 5000                 # or name a month directly
+```
+
+Each month is staged as its own batch, so the fetch → process loop is unchanged. Within a
+month the picks are spread evenly across the whole month (not the newest end), and months
+that are already exhausted contribute what they have left while their remaining quota is
+redistributed to months with headroom. Re-run `--plan-months` after batches land to refresh
+the availability numbers; per-month progress is preserved.
+
 ### Running the two halves as separate commands
 
 The same work can be split into a collection step and a processing step:

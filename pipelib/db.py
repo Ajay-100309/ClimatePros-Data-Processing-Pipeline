@@ -33,6 +33,24 @@ ORDER BY d.ReceivedDateTime DESC;
 """
 
 
+MONTH_COUNT_SQL = """
+SELECT FORMAT(d.ReceivedDateTime, 'yyyy-MM') AS ym, COUNT(*) AS n
+FROM dbo.Dispatch d
+JOIN dbo.DispatchStatus ds ON ds.DispatchStatusId = d.DispatchStatusId
+WHERE d.IsConstruction = 0
+  AND d.ReceivedDateTime IS NOT NULL
+  AND d.ReceivedDateTime >= %(dt_min)s
+  AND d.ReceivedDateTime <  %(dt_max)s
+  AND d.DispatchReason IS NOT NULL AND LEN(d.DispatchReason) > 3
+  AND ds.DispatchStatusName NOT LIKE '%%Cancel%%'
+  AND EXISTS (SELECT 1 FROM dbo.DispatchNotes dn
+              WHERE dn.DispatchId = d.DispatchId
+                AND LEN(dn.DispatchNotes) > %(min_note)s)
+GROUP BY FORMAT(d.ReceivedDateTime, 'yyyy-MM')
+ORDER BY ym DESC;
+"""
+
+
 PARTS_SQL = """
 SELECT dp.DispatchId,
        xr.InventoryId,
@@ -74,14 +92,18 @@ def connect():
     )
 
 
-def fetch_candidates(conn, n):
+def fetch_candidates(conn, n, dt_min=None, dt_max=None):
     """Newest-first candidate dispatch headers. Returns list of dicts with
-    UPPERCASE GUID strings."""
+    UPPERCASE GUID strings.
+
+    dt_min/dt_max default to the config-wide window; month-stratified fetching
+    passes one month's bounds instead (the SQL already parameterizes both).
+    """
     cur = conn.cursor(as_dict=True)
     cur.execute(CAND_SQL, {
         "n": n,
-        "dt_min": config.RECEIVED_MIN,
-        "dt_max": config.RECEIVED_CUTOFF,
+        "dt_min": dt_min or config.RECEIVED_MIN,
+        "dt_max": dt_max or config.RECEIVED_CUTOFF,
         "min_note": config.MIN_NOTE_LEN,
     })
     out = []
@@ -94,6 +116,18 @@ def fetch_candidates(conn, n):
             "status_name": (r["DispatchStatusName"] or "").strip(),
         })
     return out
+
+
+def count_candidates_by_month(conn, dt_min, dt_max):
+    """{'YYYY-MM': eligible_count} over the window, same filters as CAND_SQL.
+
+    One grouped scan; measured ~5s per month of range, so keep the window to
+    what the plan actually needs rather than all of 2013-2026.
+    """
+    cur = conn.cursor(as_dict=True)
+    cur.execute(MONTH_COUNT_SQL, {
+        "dt_min": dt_min, "dt_max": dt_max, "min_note": config.MIN_NOTE_LEN})
+    return {r["ym"]: int(r["n"]) for r in cur.fetchall()}
 
 
 def fetch_notes_for(conn, dispatch_ids):
