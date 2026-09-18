@@ -43,9 +43,9 @@ requirements.txt          Python dependencies
 state/                    existing progress — ledger, case registry, checkpoints,
                           recorded parts (parts.json), search push record
                           (search_index.json) (KEEP). NOTE: embeddings.npy,
-                          embeddings_index.json, dispatch_meta.json and batches/
-                          are too large for GitHub and are NOT in git — move them
-                          with ./sync_state.sh (see below)
+                          embeddings_index.json, dispatch_meta.json,
+                          notes_class.json and batches/ are too large for GitHub
+                          and are NOT in git — move them with ./sync_state.sh
 output/chroma_cases_extracted/   existing vector database of the cases (KEEP)
 output/part_popularity.json      part-usage prior over the indexed corpus (regenerated)
 analysis/                 the evaluation scripts behind the Parts Finder design numbers

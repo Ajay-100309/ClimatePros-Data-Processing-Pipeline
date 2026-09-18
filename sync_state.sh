@@ -14,7 +14,7 @@ RPATH="${3:-techjays/ClimatePros-Data-Processing-Pipeline}"
 # batch_current.json is the staged work order: fetch on one machine, sync, then
 # process on another. Missing files are skipped (e.g. no batch in flight).
 FILES=(state/embeddings.npy state/embeddings_index.json state/dispatch_meta.json
-       state/batch_current.json)
+       state/notes_class.json state/batch_current.json)
 mkdir -p state/batches
 case "$MODE" in
   pull)

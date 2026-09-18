@@ -6,6 +6,7 @@ venv/
 state/embeddings.npy
 state/embeddings_index.json
 state/dispatch_meta.json
+state/notes_class.json
 state/batch_current.json
 state/batches/
 analysis/eval_cache/full_run.log
