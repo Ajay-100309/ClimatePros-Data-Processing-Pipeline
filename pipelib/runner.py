@@ -1,11 +1,12 @@
 """Orchestration shared by the fetch-only, process-only, and combined CLIs.
 
-The two halves meet at state/batch_current.json: fetch() is the only step that
-opens a DB connection and it just writes the work order (dispatch headers,
+The two halves meet at state/batch_current.json.gz: fetch() is the only step
+that opens a DB connection and it just writes the work order (dispatch headers,
 notes, and recorded parts); process() consumes that file and never touches the
 DB. Nothing else crosses the boundary, so the halves can run as separate
-commands, on separate schedules, or from hosts with different network access —
-as long as they share the same state/ directory.
+commands, on separate schedules, or on different machines — the work order is
+gzipped and git-tracked precisely so it can travel to a host with no database
+access, and process() rebuilds the display metadata it needs from it.
 
 process() works through the batch in slices (config.PROCESS_CHUNK), running
 A -> B -> D per slice, so documents reach the search index throughout a long
@@ -37,7 +38,7 @@ def check_state(with_cases=False):
 
 def staged_batch():
     """The staged work order, or None if no batch is in flight."""
-    return load_json(config.BATCH_FILE)
+    return stage_fetch.load_batch()
 
 
 def stats():
@@ -103,6 +104,13 @@ def process(batch, with_cases=False, chunk_size=None):
     if not with_cases:
         # Stage D is the only reason this mode runs — refuse before LLM spend
         config.require_search_config()
+
+    # git carries the work order but not the 100MB+ dispatch_meta.json, so a
+    # process-only machine rebuilds the display fields Stage D needs from it
+    rebuilt = stage_fetch.merge_dispatch_meta(batch["dispatches"])
+    if rebuilt:
+        print(f"Rebuilt {rebuilt} dispatch_meta entries from the work order "
+              f"(fetched on another machine).")
 
     size = config.PROCESS_CHUNK if chunk_size is None else chunk_size
     chunks = _slices(batch["dispatches"], size)
@@ -197,7 +205,7 @@ def finalize(batch, notes_state, extract_state, index_state, casemap_state=None)
     archive["outcomes"] = outcomes
     archive_path = os.path.join(config.BATCH_ARCHIVE_DIR, batch["batch_id"] + ".json")
     save_json(archive_path, archive)
-    os.remove(config.BATCH_FILE)
+    stage_fetch.remove_batch()
 
     terminal = len(outcomes) - len(incomplete)
     print(f"\nBatch {batch['batch_id']} finalized: "

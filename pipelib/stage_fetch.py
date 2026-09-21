@@ -1,7 +1,9 @@
 """Stage 0: fetch candidates from the DB, exclude processed, stage the batch.
 
-The staged batch (state/batch_current.json) is the work order for the whole
-run — the DB is never touched again for this batch, so resume is DB-free.
+The staged batch (state/batch_current.json.gz) is the work order for the whole
+run — the DB is never touched again for this batch, so resume is DB-free. It is
+gzipped and git-tracked so the fetch machine (which needs VPN to the database)
+can hand it to a processing machine that has none.
 
 Two selection strategies. The default is newest-first, which is what built the
 existing corpus. Passing `month="YYYY-MM"` selects that month instead and
@@ -15,26 +17,78 @@ from . import config, db, ledger, monthplan
 from .statefiles import load_json, save_json
 
 
+def load_batch():
+    """The staged work order, or None. Falls back to the pre-gzip filename so
+    a batch staged by an older checkout is still picked up."""
+    for path in (config.BATCH_FILE, config.BATCH_FILE_LEGACY):
+        batch = load_json(path)
+        if batch is not None:
+            return batch
+    return None
+
+
+def remove_batch():
+    for path in (config.BATCH_FILE, config.BATCH_FILE_LEGACY):
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def meta_record(d):
+    """The dispatch_meta entry for a staged dispatch. Everything here comes
+    from the work order itself, which is what lets the process half rebuild
+    its own metadata on a machine that never ran the fetch."""
+    combined = "\n---\n".join(x["text"] for x in d["notes"])
+    if len(combined) > config.XLSX_CELL_LIMIT:
+        combined = combined[:config.XLSX_CELL_LIMIT] + " [TRUNCATED]"
+    return {
+        "dispatch_number": d["dispatch_number"],
+        "reason": d["reason"],
+        "received_dt": d["received_dt"],
+        "note_count": len(d["notes"]),
+        "combined_notes": combined,
+    }
+
+
+def merge_dispatch_meta(dispatches):
+    """Add display metadata for any staged dispatch missing from
+    state/dispatch_meta.json. Returns the number added.
+
+    dispatch_meta.json is 100MB+ and untracked, so it never crosses machines;
+    the process half calls this so Stage D still has reason / dispatchNumber /
+    receivedDt for the documents it pushes.
+    """
+    meta = load_json(config.DISPATCH_META_FILE, {})
+    added = 0
+    for d in dispatches:
+        if d["dispatch_id"] not in meta:
+            meta[d["dispatch_id"]] = meta_record(d)
+            added += 1
+    if added:
+        save_json(config.DISPATCH_META_FILE, meta)
+    return added
+
+
 def _clear_if_already_processed(existing):
     """True when the staged batch was already processed on another machine.
 
-    batch_current.json is untracked (it is ~40MB at count=10000), so a batch
-    processed on the server leaves a stale copy here that would otherwise block
-    every future fetch. The batch archive — synced with it — is the proof that
-    it finished, so drop the stale work order instead of refusing.
+    When the work order travels by git the processing machine deletes it on
+    finalize and that deletion comes back on the next pull, so this mostly
+    matters for rsync handoffs, where a stale copy would block every future
+    fetch. The batch archive is the proof it finished, so drop the stale work
+    order instead of refusing.
     """
     archive = os.path.join(config.BATCH_ARCHIVE_DIR, existing["batch_id"] + ".json")
     if not os.path.exists(archive):
         return False
     print(f"Staged batch {existing['batch_id']} was already processed elsewhere "
           f"(archive present) — clearing the stale work order.")
-    os.remove(config.BATCH_FILE)
+    remove_batch()
     return True
 
 
 def stage_batch(count, dry_run=False, month=None):
     # a dry run writes nothing, so an in-flight batch must not block a preview
-    existing = None if dry_run else load_json(config.BATCH_FILE)
+    existing = None if dry_run else load_batch()
     if existing is not None and not _clear_if_already_processed(existing):
         print(f"Staged batch {existing['batch_id']} already exists "
               f"({len(existing['dispatches'])} dispatches) — using it; "
@@ -90,16 +144,7 @@ def stage_batch(count, dry_run=False, month=None):
     # display metadata for cumulative reports
     meta = load_json(config.DISPATCH_META_FILE, {})
     for d in dispatches:
-        combined = "\n---\n".join(x["text"] for x in d["notes"])
-        if len(combined) > config.XLSX_CELL_LIMIT:
-            combined = combined[:config.XLSX_CELL_LIMIT] + " [TRUNCATED]"
-        meta[d["dispatch_id"]] = {
-            "dispatch_number": d["dispatch_number"],
-            "reason": d["reason"],
-            "received_dt": d["received_dt"],
-            "note_count": len(d["notes"]),
-            "combined_notes": combined,
-        }
+        meta[d["dispatch_id"]] = meta_record(d)
     save_json(config.DISPATCH_META_FILE, meta)
 
     # recorded parts per staged dispatch — an explicit [] means "checked, none

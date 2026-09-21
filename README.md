@@ -150,6 +150,28 @@ that are already exhausted contribute what they have left while their remaining 
 redistributed to months with headroom. Re-run `--plan-months` after batches land to refresh
 the availability numbers; per-month progress is preserved.
 
+### Fetching and processing on different machines
+
+The fetch half needs VPN access to FieldJetXStg; the process half needs only the
+LLM gateway and Azure AI Search. The work order (`state/batch_current.json.gz`) is
+gzipped and committed to git, so git itself can carry the batch between them:
+
+```
+# on the machine with database access
+python fetch.py --next-month
+git add -A && git commit -m "staged <month>" && git push
+
+# on the processing machine
+git pull
+python process.py
+git add -A && git commit -m "processed <month>" && git push
+```
+
+`process.py` rebuilds the display metadata it needs from the work order, so the
+100 MB+ `state/dispatch_meta.json` never has to travel. When it finalizes, it
+deletes the work order and commits that deletion — pulling it back on the fetch
+machine clears the way for the next batch.
+
 ### Running the two halves as separate commands
 
 The same work can be split into a collection step and a processing step:

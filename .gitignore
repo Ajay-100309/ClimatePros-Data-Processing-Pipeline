@@ -7,6 +7,7 @@ state/embeddings.npy
 state/embeddings_index.json
 state/dispatch_meta.json
 state/notes_class.json
-state/batch_current.json
+# state/batch_current.json is now gzipped AND tracked — git is the transport
+# from the VPN-connected fetch machine to the processing server
 state/batches/
 analysis/eval_cache/full_run.log

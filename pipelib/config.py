@@ -90,7 +90,11 @@ SEARCH_STATE_FILE = os.path.join(STATE_DIR, "search_index.json")
 NOTES_CLASS_FILE = os.path.join(STATE_DIR, "notes_class.json")
 EXTRACT_FILE = os.path.join(STATE_DIR, "extract.json")
 DISPATCH_META_FILE = os.path.join(STATE_DIR, "dispatch_meta.json")
-BATCH_FILE = os.path.join(STATE_DIR, "batch_current.json")
+# The work order is gzipped and git-tracked: it is the one state file that must
+# travel from the fetch machine (VPN to the DB) to the process machine, and git
+# is the transport when rsync is not available. ~7MB per 5000 dispatches.
+BATCH_FILE = os.path.join(STATE_DIR, "batch_current.json.gz")
+BATCH_FILE_LEGACY = os.path.join(STATE_DIR, "batch_current.json")
 FETCH_PLAN_FILE = os.path.join(STATE_DIR, "fetch_plan.json")
 EMB_NPY = os.path.join(STATE_DIR, "embeddings.npy")
 EMB_INDEX = os.path.join(STATE_DIR, "embeddings_index.json")
