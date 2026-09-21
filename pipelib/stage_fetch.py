@@ -33,35 +33,46 @@ def remove_batch():
             os.remove(path)
 
 
-def meta_record(d):
+def meta_record(d, light=False):
     """The dispatch_meta entry for a staged dispatch. Everything here comes
     from the work order itself, which is what lets the process half rebuild
-    its own metadata on a machine that never ran the fetch."""
-    combined = "\n---\n".join(x["text"] for x in d["notes"])
-    if len(combined) > config.XLSX_CELL_LIMIT:
-        combined = combined[:config.XLSX_CELL_LIMIT] + " [TRUNCATED]"
-    return {
+    its own metadata on a machine that never ran the fetch.
+
+    `light` drops combined_notes — the whole note text, and ~90% of the file's
+    bulk. Only reports.py reads it (for the legacy --with-cases spreadsheet,
+    via .get with a default); Stage D needs just the three display fields.
+    """
+    rec = {
         "dispatch_number": d["dispatch_number"],
         "reason": d["reason"],
         "received_dt": d["received_dt"],
         "note_count": len(d["notes"]),
-        "combined_notes": combined,
     }
+    if light:
+        return rec
+    combined = "\n---\n".join(x["text"] for x in d["notes"])
+    if len(combined) > config.XLSX_CELL_LIMIT:
+        combined = combined[:config.XLSX_CELL_LIMIT] + " [TRUNCATED]"
+    rec["combined_notes"] = combined
+    return rec
 
 
-def merge_dispatch_meta(dispatches):
+def merge_dispatch_meta(dispatches, light=True):
     """Add display metadata for any staged dispatch missing from
     state/dispatch_meta.json. Returns the number added.
 
-    dispatch_meta.json is 100MB+ and untracked, so it never crosses machines;
-    the process half calls this so Stage D still has reason / dispatchNumber /
-    receivedDt for the documents it pushes.
+    dispatch_meta.json is 100MB+ on the fetch machine and untracked, so it
+    never crosses machines; the process half calls this so Stage D still has
+    reason / dispatchNumber / receivedDt for the documents it pushes. Records
+    are written light by default, which keeps a process-only machine's copy at
+    a few MB instead of mirroring the fetch machine's — the notes it would
+    otherwise duplicate are already in the work order.
     """
     meta = load_json(config.DISPATCH_META_FILE, {})
     added = 0
     for d in dispatches:
         if d["dispatch_id"] not in meta:
-            meta[d["dispatch_id"]] = meta_record(d)
+            meta[d["dispatch_id"]] = meta_record(d, light=light)
             added += 1
     if added:
         save_json(config.DISPATCH_META_FILE, meta)

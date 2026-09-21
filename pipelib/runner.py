@@ -106,8 +106,10 @@ def process(batch, with_cases=False, chunk_size=None):
         config.require_search_config()
 
     # git carries the work order but not the 100MB+ dispatch_meta.json, so a
-    # process-only machine rebuilds the display fields Stage D needs from it
-    rebuilt = stage_fetch.merge_dispatch_meta(batch["dispatches"])
+    # process-only machine rebuilds the display fields Stage D needs from it.
+    # Light records (no combined_notes) keep that machine's copy ~20MB rather
+    # than mirroring the fetch machine's, which matters on a small disk.
+    rebuilt = stage_fetch.merge_dispatch_meta(batch["dispatches"], light=True)
     if rebuilt:
         print(f"Rebuilt {rebuilt} dispatch_meta entries from the work order "
               f"(fetched on another machine).")
