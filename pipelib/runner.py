@@ -205,7 +205,9 @@ def finalize(batch, notes_state, extract_state, index_state, casemap_state=None)
 
     archive = dict(batch)
     archive["outcomes"] = outcomes
-    archive_path = os.path.join(config.BATCH_ARCHIVE_DIR, batch["batch_id"] + ".json")
+    # gzipped — this file never leaves the processing machine (batches/ is
+    # untracked bulk) and disk headroom there has been the tight constraint
+    archive_path = os.path.join(config.BATCH_ARCHIVE_DIR, batch["batch_id"] + ".json.gz")
     save_json(archive_path, archive)
     stage_fetch.remove_batch()
 

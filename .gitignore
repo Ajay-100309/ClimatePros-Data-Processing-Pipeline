@@ -11,3 +11,4 @@ state/notes_class.json
 # from the VPN-connected fetch machine to the processing server
 state/batches/
 analysis/eval_cache/full_run.log
+*.ovpn

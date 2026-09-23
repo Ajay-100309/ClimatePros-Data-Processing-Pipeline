@@ -33,6 +33,13 @@ def remove_batch():
             os.remove(path)
 
 
+def archive_exists(batch_id):
+    """True if this batch was already finalized (any archive extension —
+    archives moved from .json to .json.gz partway through the project)."""
+    base = os.path.join(config.BATCH_ARCHIVE_DIR, batch_id)
+    return os.path.exists(base + ".json") or os.path.exists(base + ".json.gz")
+
+
 def meta_record(d, light=False):
     """The dispatch_meta entry for a staged dispatch. Everything here comes
     from the work order itself, which is what lets the process half rebuild
@@ -88,8 +95,7 @@ def _clear_if_already_processed(existing):
     fetch. The batch archive is the proof it finished, so drop the stale work
     order instead of refusing.
     """
-    archive = os.path.join(config.BATCH_ARCHIVE_DIR, existing["batch_id"] + ".json")
-    if not os.path.exists(archive):
+    if not archive_exists(existing["batch_id"]):
         return False
     print(f"Staged batch {existing['batch_id']} was already processed elsewhere "
           f"(archive present) — clearing the stale work order.")
