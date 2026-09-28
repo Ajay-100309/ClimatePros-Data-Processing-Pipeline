@@ -158,15 +158,36 @@ class Corpus:
         self.freq = {norm_part(k): v for k, v in pop["freq"].items()}
         self.max_global = max(pop["max_global"], 1)
 
-        # vectors: every pushed doc's text_sha must resolve to a cached row
+        # vectors: every pushed doc's text_sha must resolve to a cached row.
+        # embeddings.npy is untracked bulk (each machine keeps its own copy),
+        # so a machine that never ran Stage D for some dispatches is missing
+        # their vectors even though search_index.json (tracked) already knows
+        # they're pushed. Recover the source text (extract -> casemap -> Azure,
+        # same lookup Stage D itself uses) and re-embed on demand: same text,
+        # same model, deterministic, so the vector is identical to Azure's.
         cache = EmbCache()
-        rows, missing = [], []
-        for did in self.docids:
-            row = cache.index.get(self.pushed[did]["text_sha"])
-            (missing if row is None else rows).append(row if row is not None else did)
-        if missing:
-            sys.exit(f"{len(missing)} pushed docs have no cached vector "
-                     f"(first: {missing[0]}) - cache and push record disagree.")
+        missing_dids = [d for d in self.docids
+                        if self.pushed[d]["text_sha"] not in cache.index]
+        if missing_dids:
+            print(f"{len(missing_dids)} pushed docs have no cached vector locally "
+                  f"- recovering source text and re-embedding on demand...")
+            client = search_index.search_client()
+            to_embed, unresolved = [], []
+            for did in missing_dids:
+                text = self.indexed_text(did, client)
+                if text and config.text_sha(text) == self.pushed[did]["text_sha"]:
+                    to_embed.append(text)
+                else:
+                    unresolved.append(did)
+            if unresolved:
+                sys.exit(f"{len(unresolved)} pushed docs have no recoverable source "
+                         f"text at all (first: {unresolved[0]}) - cannot re-embed.")
+            print(f"  re-embedding {len(to_embed)} texts "
+                  f"({math.ceil(len(to_embed) / config.EMBED_BATCH)} gateway batches)...")
+            cache.ensure(to_embed)
+            print(f"  done - embeddings.npy now has {cache.array.shape[0]} vectors.")
+
+        rows = [cache.index[self.pushed[d]["text_sha"]] for d in self.docids]
         mat = cache.array[np.asarray(rows)]
         self.doc_vecs = (mat / np.linalg.norm(mat, axis=1, keepdims=True)
                          ).astype(np.float32)
