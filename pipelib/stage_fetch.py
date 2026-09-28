@@ -134,11 +134,79 @@ def stage_batch(count, dry_run=False, month=None):
                 print(f"  ... and {len(selected) - 20} more")
             return None
 
-        ids = [h["dispatch_id"] for h in selected]
-        notes = db.fetch_notes_for(conn, ids)
-        parts = db.fetch_parts_for(conn, ids)
+        return _finish_and_save(conn, selected, count_requested=count,
+                                months=[month] if month else [],
+                                strategy="month_spread" if month else "newest_first")
     finally:
         conn.close()
+
+
+def stage_multi_month_batch(month_counts, dry_run=False):
+    """Stage several months into ONE combined work order.
+
+    month_counts: [(month, count)], oldest first — typically straight from
+    monthplan.next_months(). Each month is selected independently (same
+    exclude-then-spread rule as a single month; date ranges never overlap
+    between months so there is no double-selection risk), then notes/parts
+    are fetched once over the combined id list — this is what lets one
+    process.py run churn through several months without a git round trip
+    after each one.
+    """
+    existing = None if dry_run else load_batch()
+    if existing is not None and not _clear_if_already_processed(existing):
+        print(f"Staged batch {existing['batch_id']} already exists "
+              f"({len(existing['dispatches'])} dispatches) — using it; "
+              "nothing new fetched.")
+        return existing
+
+    led = ledger.load()
+    casemap = load_json(config.CASEMAP_FILE)
+    exclude = ledger.processed_ids(led) | set(casemap["dispatches"].keys())
+
+    conn = db.connect()
+    try:
+        selected, by_month = [], {}
+        for month, count in month_counts:
+            picked = _select_month(conn, count, exclude, month)
+            by_month[month] = picked
+            selected.extend(picked)
+
+        if dry_run:
+            print(f"\n--dry-run: would stage {len(selected)} dispatches across "
+                  f"{len(month_counts)} months (excluded pool: {len(exclude)}):")
+            _gzip_heads_up(len(selected))
+            for month, _ in month_counts:
+                _print_spread(by_month[month], month)
+            for h in selected[:20]:
+                print(f"  {h['dispatch_id']}  {h['received_dt']}  {h['reason'][:60]}")
+            if len(selected) > 20:
+                print(f"  ... and {len(selected) - 20} more")
+            return None
+
+        return _finish_and_save(conn, selected,
+                                count_requested=sum(c for _, c in month_counts),
+                                months=[m for m, _ in month_counts],
+                                strategy="month_spread_multi")
+    finally:
+        conn.close()
+
+
+# rough measured ratio for the git-blob-size heads up below: a 10k-dispatch
+# work order gzips to ~14.3MB (build_document-shaped JSON, mostly note text)
+GZIP_MB_PER_1K = 1.43
+
+
+def _gzip_heads_up(n_dispatches):
+    est = n_dispatches * GZIP_MB_PER_1K / 1000
+    if est > 30:
+        print(f"  Work order is ~{est:.0f}MB gzipped (est.) — GitHub warns above "
+              f"50MB and hard-blocks above 100MB per file.")
+
+
+def _finish_and_save(conn, selected, count_requested, months, strategy):
+    ids = [h["dispatch_id"] for h in selected]
+    notes = db.fetch_notes_for(conn, ids)
+    parts = db.fetch_parts_for(conn, ids)
 
     dispatches = []
     for h in selected:
@@ -151,9 +219,9 @@ def stage_batch(count, dry_run=False, month=None):
     batch = {
         "batch_id": "batch_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"),
         "fetched_at": datetime.now(timezone.utc).isoformat(),
-        "count_requested": count,
-        "strategy": "month_spread" if month else "newest_first",
-        "month": month,
+        "count_requested": count_requested,
+        "strategy": strategy,
+        "months": months,
         "dispatches": dispatches,
     }
     save_json(config.BATCH_FILE, batch)
@@ -174,15 +242,25 @@ def stage_batch(count, dry_run=False, month=None):
         }
     save_json(config.PARTS_FILE, parts_state)
 
-    if month:
+    if months:
+        # group the FINAL (post notes-skip) dispatches back to their source
+        # month via received_dt — months are disjoint date ranges so this is
+        # exact, and it works uniformly for one month or several
+        by_month = {}
+        for d in dispatches:
+            ym = (d.get("received_dt") or "")[:7]
+            by_month[ym] = by_month.get(ym, 0) + 1
         plan = monthplan.load_plan()
         if plan:
-            monthplan.save_plan(monthplan.record_fetched(plan, month, len(dispatches)))
+            for m in months:
+                monthplan.record_fetched(plan, m, by_month.get(m, 0))
+            monthplan.save_plan(plan)
 
     with_parts = sum(1 for d in dispatches if parts.get(d["dispatch_id"]))
     print(f"Staged batch {batch['batch_id']}"
-          + (f" [{month}]" if month else "")
+          + (f" [{'+'.join(months)}]" if months else "")
           + f": {len(dispatches)} dispatches ({with_parts} with recorded parts).")
+    _gzip_heads_up(len(dispatches))
     return batch
 
 

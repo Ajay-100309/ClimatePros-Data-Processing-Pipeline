@@ -80,6 +80,17 @@ def fetch(count, dry_run=False, month=None):
     return stage_fetch.stage_batch(count, dry_run=dry_run, month=month)
 
 
+def fetch_months(month_counts, dry_run=False):
+    """Stage several months (oldest first) into ONE combined work order, so a
+    single process.py run churns through all of them without a git round trip
+    after each month. month_counts: [(month, count)], typically straight from
+    monthplan.next_months().
+    """
+    statefiles.ensure_dirs()
+    check_state()
+    return stage_fetch.stage_multi_month_batch(month_counts, dry_run=dry_run)
+
+
 def _slices(dispatches, size):
     """The batch split into A->B->D passes. An empty batch still yields one
     (empty) slice so the stages run once and hand back their global state."""

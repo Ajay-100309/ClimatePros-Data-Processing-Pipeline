@@ -27,6 +27,7 @@ Usage:
     venv/bin/python fetch.py --plan-months --per-month 5000 --months 24
     venv/bin/python fetch.py --show-plan
     venv/bin/python fetch.py --next-month
+    venv/bin/python fetch.py --next-month 3       # combine 3 months into one work order
     venv/bin/python fetch.py --month 2025-02 --count 5000
 """
 import re
@@ -78,8 +79,12 @@ def main():
                     help="fetch + exclusion report only; nothing written")
     ap.add_argument("--month", metavar="YYYY-MM",
                     help="stage from this month, spread evenly across it")
-    ap.add_argument("--next-month", action="store_true",
-                    help="stage the oldest month still short of its plan quota")
+    ap.add_argument("--next-month", type=int, nargs="?", const=1, default=None,
+                    metavar="N",
+                    help="stage the oldest month(s) still short of quota; bare "
+                         "flag = 1 month (old behavior), or e.g. --next-month 3 "
+                         "to combine 3 months into one work order for a single "
+                         "longer process.py run")
     ap.add_argument("--plan-months", action="store_true",
                     help="(re)build state/fetch_plan.json for a month window")
     ap.add_argument("--show-plan", action="store_true",
@@ -106,22 +111,42 @@ def main():
 
     month, count = args.month, args.count
 
-    if args.next_month:
+    if args.next_month is not None:
         if month:
             sys.exit("--next-month and --month are mutually exclusive.")
+        if args.next_month < 1:
+            sys.exit(f"--next-month N must be >= 1, got {args.next_month}")
         plan = monthplan.load_plan()
         if not plan:
             sys.exit("No fetch plan yet — run: venv/bin/python fetch.py --plan-months")
-        month = monthplan.next_month(plan)
-        if month is None:
-            print("Fetch plan complete — every month has met its quota.")
-            print(monthplan.format_plan(plan))
+
+        if args.next_month == 1:
+            month = monthplan.next_month(plan)
+            if month is None:
+                print("Fetch plan complete — every month has met its quota.")
+                print(monthplan.format_plan(plan))
+                return
+            rec = plan["months"][month]
+            count = count or (rec["quota"] - rec["fetched"])
+            print(f"Next month from plan: {month} "
+                  f"(quota {rec['quota']:,}, fetched {rec['fetched']:,}, "
+                  f"staging {count:,})")
+        else:
+            month_counts = monthplan.next_months(plan, args.next_month)
+            if not month_counts:
+                print("Fetch plan complete — every month has met its quota.")
+                print(monthplan.format_plan(plan))
+                return
+            total = sum(c for _, c in month_counts)
+            print(f"Next {len(month_counts)} month(s) from plan: "
+                  + ", ".join(f"{m} ({c:,})" for m, c in month_counts)
+                  + f" — {total:,} dispatches combined into one work order")
+            batch = runner.fetch_months(month_counts, dry_run=args.dry_run)
+            if batch is None:
+                return  # dry run; stage_fetch already printed the report
+            print(f"Work order: {config.BATCH_FILE}")
+            print("Next: venv/bin/python process.py")
             return
-        rec = plan["months"][month]
-        count = count or (rec["quota"] - rec["fetched"])
-        print(f"Next month from plan: {month} "
-              f"(quota {rec['quota']:,}, fetched {rec['fetched']:,}, "
-              f"staging {count:,})")
 
     if month and not MONTH_RE.match(month):
         sys.exit(f"--month must be YYYY-MM, got {month!r}")

@@ -121,6 +121,19 @@ def next_month(plan):
     return None
 
 
+def next_months(plan, n):
+    """Up to n oldest still-short months, as [(month, remaining_quota)]."""
+    out = []
+    for m in sorted(plan["months"]):
+        rec = plan["months"][m]
+        remaining = rec["quota"] - rec["fetched"]
+        if remaining > 0:
+            out.append((m, remaining))
+            if len(out) >= n:
+                break
+    return out
+
+
 def record_fetched(plan, ym, n):
     rec = plan["months"].setdefault(
         ym, {"eligible": 0, "processed": 0, "available": 0, "quota": 0, "fetched": 0})
