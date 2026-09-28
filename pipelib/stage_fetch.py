@@ -11,6 +11,7 @@ spreads the picks evenly across it (see _select_month), so the corpus can cover
 all twelve calendar months rather than only the most recent few.
 """
 import os
+import sys
 from datetime import datetime, timezone
 
 from . import config, db, ledger, monthplan
@@ -189,6 +190,124 @@ def stage_multi_month_batch(month_counts, dry_run=False):
                                 strategy="month_spread_multi")
     finally:
         conn.close()
+
+
+def _batch_months(batch):
+    """Schema-compatible months list — the pre-refactor schema stored a single
+    'month' string; the current one always stores a 'months' list."""
+    if batch.get("months"):
+        return list(batch["months"])
+    if batch.get("month"):
+        return [batch["month"]]
+    return []
+
+
+def append_months_to_batch(month_counts, dry_run=False):
+    """Add more months onto the currently staged (NOT YET PROCESSED) batch,
+    instead of starting a fresh one. If nothing is staged (or the staged
+    batch turns out to be stale/already-processed elsewhere), this falls back
+    to stage_multi_month_batch. Safe because months are disjoint date ranges
+    — a dispatch selected for a new month can never collide with one already
+    in the batch.
+
+    Only append BEFORE the batch has been handed to the processing machine
+    (i.e. before commit+push, or before process.py has started on it there).
+    process.py loads the work order once at the start of a run and deletes it
+    on finish based on that in-memory copy — an append made and pushed after
+    processing has already begun there would be silently lost when that run
+    finalizes, not corrupted, just wasted (the appended dispatches were never
+    marked processed anywhere, so they're simply re-selected next time).
+    """
+    existing = load_batch()
+    if existing is not None and _clear_if_already_processed(existing):
+        existing = None
+    if existing is None:
+        print("No batch currently staged — staging fresh instead of appending.")
+        return stage_multi_month_batch(month_counts, dry_run=dry_run)
+
+    already = _batch_months(existing)
+    overlap = sorted(set(already) & {m for m, _ in month_counts})
+    if overlap:
+        sys.exit(f"{overlap} already in the staged batch {existing['batch_id']} — "
+                 f"nothing to append (check state/fetch_plan.json / --show-plan).")
+
+    led = ledger.load()
+    casemap = load_json(config.CASEMAP_FILE)
+    exclude = ledger.processed_ids(led) | set(casemap["dispatches"].keys())
+
+    conn = db.connect()
+    try:
+        selected, by_month = [], {}
+        for month, count in month_counts:
+            picked = _select_month(conn, count, exclude, month)
+            by_month[month] = picked
+            selected.extend(picked)
+
+        if dry_run:
+            print(f"\n--dry-run: would ADD {len(selected)} dispatches across "
+                  f"{len(month_counts)} months to batch {existing['batch_id']} "
+                  f"(currently {len(existing['dispatches'])} staged, months {already}):")
+            _gzip_heads_up(len(existing['dispatches']) + len(selected))
+            for month, _ in month_counts:
+                _print_spread(by_month[month], month)
+            for h in selected[:20]:
+                print(f"  {h['dispatch_id']}  {h['received_dt']}  {h['reason'][:60]}")
+            if len(selected) > 20:
+                print(f"  ... and {len(selected) - 20} more")
+            return None
+
+        ids = [h["dispatch_id"] for h in selected]
+        notes = db.fetch_notes_for(conn, ids)
+        parts = db.fetch_parts_for(conn, ids)
+    finally:
+        conn.close()
+
+    new_dispatches = []
+    for h in selected:
+        n = notes.get(h["dispatch_id"], [])
+        if not n:
+            print(f"  Skipping {h['dispatch_id']}: no non-empty notes returned.")
+            continue
+        new_dispatches.append({**h, "notes": n})
+
+    existing["dispatches"].extend(new_dispatches)
+    existing["count_requested"] = (existing.get("count_requested", 0)
+                                   + sum(c for _, c in month_counts))
+    existing["months"] = sorted(set(already) | {m for m, _ in month_counts})
+    existing.pop("month", None)  # superseded by the months list
+    existing["strategy"] = "month_spread_multi"
+    save_json(config.BATCH_FILE, existing)
+
+    meta = load_json(config.DISPATCH_META_FILE, {})
+    for d in new_dispatches:
+        meta[d["dispatch_id"]] = meta_record(d)
+    save_json(config.DISPATCH_META_FILE, meta)
+
+    parts_state = load_json(config.PARTS_FILE, {"schema": 1, "dispatches": {}})
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    for d in new_dispatches:
+        parts_state["dispatches"][d["dispatch_id"]] = {
+            "fetched_at": fetched_at,
+            "items": parts.get(d["dispatch_id"], []),
+        }
+    save_json(config.PARTS_FILE, parts_state)
+
+    by_month_new = {}
+    for d in new_dispatches:
+        ym = (d.get("received_dt") or "")[:7]
+        by_month_new[ym] = by_month_new.get(ym, 0) + 1
+    plan = monthplan.load_plan()
+    if plan:
+        for m, _ in month_counts:
+            monthplan.record_fetched(plan, m, by_month_new.get(m, 0))
+        monthplan.save_plan(plan)
+
+    with_parts_new = sum(1 for d in new_dispatches if parts.get(d["dispatch_id"]))
+    print(f"Added {len(new_dispatches)} dispatches ({with_parts_new} with parts) to "
+          f"batch {existing['batch_id']} — now {len(existing['dispatches'])} total "
+          f"across months {existing['months']}.")
+    _gzip_heads_up(len(existing["dispatches"]))
+    return existing
 
 
 # rough measured ratio for the git-blob-size heads up below: a 10k-dispatch

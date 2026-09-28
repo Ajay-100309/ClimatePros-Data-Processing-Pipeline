@@ -85,6 +85,12 @@ def main():
                          "flag = 1 month (old behavior), or e.g. --next-month 3 "
                          "to combine 3 months into one work order for a single "
                          "longer process.py run")
+    ap.add_argument("--append-months", type=int, metavar="N",
+                    help="add the next N plan months onto the currently staged, "
+                         "not-yet-processed batch, instead of starting fresh — "
+                         "only safe before that batch is handed to a processing "
+                         "machine (before commit+push, or before process.py "
+                         "starts on it there)")
     ap.add_argument("--plan-months", action="store_true",
                     help="(re)build state/fetch_plan.json for a month window")
     ap.add_argument("--show-plan", action="store_true",
@@ -110,6 +116,30 @@ def main():
         return
 
     month, count = args.month, args.count
+
+    if args.append_months is not None:
+        if month or args.next_month is not None:
+            sys.exit("--append-months can't be combined with --month or --next-month.")
+        if args.append_months < 1:
+            sys.exit(f"--append-months N must be >= 1, got {args.append_months}")
+        plan = monthplan.load_plan()
+        if not plan:
+            sys.exit("No fetch plan yet — run: venv/bin/python fetch.py --plan-months")
+        month_counts = monthplan.next_months(plan, args.append_months)
+        if not month_counts:
+            print("Fetch plan complete — every month has met its quota.")
+            print(monthplan.format_plan(plan))
+            return
+        total = sum(c for _, c in month_counts)
+        print(f"Appending {len(month_counts)} month(s): "
+              + ", ".join(f"{m} ({c:,})" for m, c in month_counts)
+              + f" — {total:,} more dispatches")
+        batch = runner.append_months(month_counts, dry_run=args.dry_run)
+        if batch is None:
+            return  # dry run; stage_fetch already printed the report
+        print(f"Work order: {config.BATCH_FILE}")
+        print("Next: venv/bin/python process.py")
+        return
 
     if args.next_month is not None:
         if month:

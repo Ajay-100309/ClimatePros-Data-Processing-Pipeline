@@ -91,6 +91,16 @@ def fetch_months(month_counts, dry_run=False):
     return stage_fetch.stage_multi_month_batch(month_counts, dry_run=dry_run)
 
 
+def append_months(month_counts, dry_run=False):
+    """Add more months onto the currently staged, not-yet-processed batch
+    instead of starting a fresh one. Only safe before that batch has been
+    handed to a processing machine — see stage_fetch.append_months_to_batch.
+    """
+    statefiles.ensure_dirs()
+    check_state()
+    return stage_fetch.append_months_to_batch(month_counts, dry_run=dry_run)
+
+
 def _slices(dispatches, size):
     """The batch split into A->B->D passes. An empty batch still yields one
     (empty) slice so the stages run once and hand back their global state."""
