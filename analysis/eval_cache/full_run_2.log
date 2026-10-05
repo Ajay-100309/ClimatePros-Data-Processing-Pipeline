@@ -1,0 +1,155 @@
+Loading corpus (state + vectors)...
+Corpus: 42716 indexed docs, 7278 with real parts.
+Query set: n=1000 (arms A,B,C; variants vector,vector_hasparts,bm25)
+Paraphrasing 810 root causes (~810 chat calls at the 60 RPM gateway limit)...
+  25/810 paraphrased
+  50/810 paraphrased
+  75/810 paraphrased
+  100/810 paraphrased
+  125/810 paraphrased
+  150/810 paraphrased
+  175/810 paraphrased
+  200/810 paraphrased
+  225/810 paraphrased
+  250/810 paraphrased
+  275/810 paraphrased
+  300/810 paraphrased
+  325/810 paraphrased
+  350/810 paraphrased
+  375/810 paraphrased
+  400/810 paraphrased
+  425/810 paraphrased
+  450/810 paraphrased
+  475/810 paraphrased
+  500/810 paraphrased
+  525/810 paraphrased
+  550/810 paraphrased
+  575/810 paraphrased
+  600/810 paraphrased
+  625/810 paraphrased
+  650/810 paraphrased
+  675/810 paraphrased
+  700/810 paraphrased
+  725/810 paraphrased
+  750/810 paraphrased
+  775/810 paraphrased
+  800/810 paraphrased
+  810/810 paraphrased
+Embedded 1655 fresh eval query texts (17 gateway batches).
+Retrieving arm A / vector: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm A / vector_hasparts: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm A / bm25: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm B / vector: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm B / vector_hasparts: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm B / bm25: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm C / vector: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm C / vector_hasparts: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieving arm C / bm25: 835 queries...
+  100/835
+  200/835
+  300/835
+  400/835
+  500/835
+  600/835
+  700/835
+  800/835
+  835/835
+Retrieval done: 7515 Azure calls this run.
+Judging 193 queries x top-10 contexts (193 chat calls)...
+  10/193 judged
+  20/193 judged
+  30/193 judged
+  40/193 judged
+  50/193 judged
+  60/193 judged
+  70/193 judged
+  80/193 judged
+  90/193 judged
+  100/193 judged
+  110/193 judged
+  120/193 judged
+  130/193 judged
+  140/193 judged
+  150/193 judged
+  160/193 judged
+  170/193 judged
+  180/193 judged
+  190/193 judged
+  193/193 judged
+Scoring (offline)...
+Scores written: /Users/ajayp/TechJays/Projects/ClimatePros -  Production/pipeline/output/eval_scores.json
+Report written: /Users/ajayp/TechJays/Projects/ClimatePros -  Production/pipeline/output/rag_eval_report.html
+
+Headline (arm A / vector, k=100, lambda=0.1): hit@6 49.5% [46.4%-52.6%], MRR 0.337, n=1000
