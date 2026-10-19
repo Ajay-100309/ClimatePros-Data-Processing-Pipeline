@@ -12,3 +12,4 @@ state/notes_class.json
 state/batches/
 analysis/eval_cache/full_run.log
 *.ovpn
+.claude/worktrees/
