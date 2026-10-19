@@ -1,0 +1,61 @@
+Loading corpus (state + vectors)...
+17901 pushed docs have no cached vector locally - recovering source text and re-embedding on demand...
+  re-embedding 17901 texts (180 gateway batches)...
+  done - embeddings.npy now has 59593 vectors.
+Corpus: 60935 indexed docs, 10464 with real parts.
+Frozen query order over 10362 labeled dispatches (seed 4242).
+Query set: n=300 (arms A,B,C; variants vector,vector_hasparts,bm25)
+Paraphrasing 245 root causes (~245 chat calls at the 60 RPM gateway limit)...
+  25/245 paraphrased
+  50/245 paraphrased
+  75/245 paraphrased
+  100/245 paraphrased
+  125/245 paraphrased
+  150/245 paraphrased
+  175/245 paraphrased
+  200/245 paraphrased
+  225/245 paraphrased
+  245/245 paraphrased
+Embedded 485 fresh eval query texts (5 gateway batches).
+Retrieving arm A / vector: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm A / vector_hasparts: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm A / bm25: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm B / vector: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm B / vector_hasparts: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm B / bm25: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm C / vector: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm C / vector_hasparts: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieving arm C / bm25: 245 queries...
+  100/245
+  200/245
+  245/245
+Retrieval done: 2205 Azure calls this run.
+Scoring (offline)...
+Scores written: /Users/ajayp/TechJays/Projects/ClimatePros -  Production/pipeline/output/eval_scores.json
+Report written: /Users/ajayp/TechJays/Projects/ClimatePros -  Production/pipeline/output/rag_eval_report.html
+
+Headline (arm A / vector, k=100, lambda=0.1): hit@6 52.0% [46.4%-57.6%], MRR 0.362, n=300
