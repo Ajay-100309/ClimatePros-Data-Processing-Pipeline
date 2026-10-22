@@ -104,7 +104,7 @@ def _clear_if_already_processed(existing):
     return True
 
 
-def stage_batch(count, dry_run=False, month=None):
+def stage_batch(count, dry_run=False, month=None, parts_only=False):
     # a dry run writes nothing, so an in-flight batch must not block a preview
     existing = None if dry_run else load_batch()
     if existing is not None and not _clear_if_already_processed(existing):
@@ -114,6 +114,10 @@ def stage_batch(count, dry_run=False, month=None):
         if existing["count_requested"] != count:
             print(f"  (note: it was staged with --count {existing['count_requested']}, "
                   f"current --count {count} ignored)")
+        if bool(existing.get("parts_only")) != parts_only:
+            print(f"  (note: it was staged with parts_only="
+                  f"{bool(existing.get('parts_only'))}, current --parts-only "
+                  f"({parts_only}) ignored — process or clear it first)")
         return existing
 
     led = ledger.load()
@@ -122,8 +126,8 @@ def stage_batch(count, dry_run=False, month=None):
 
     conn = db.connect()
     try:
-        selected = (_select_month(conn, count, exclude, month) if month
-                    else _select(conn, count, exclude))
+        selected = (_select_month(conn, count, exclude, month, parts_only=parts_only) if month
+                    else _select(conn, count, exclude, parts_only=parts_only))
         if dry_run:
             print(f"\n--dry-run: would stage {len(selected)} dispatches "
                   f"(excluded pool: {len(exclude)}):")
@@ -137,12 +141,13 @@ def stage_batch(count, dry_run=False, month=None):
 
         return _finish_and_save(conn, selected, count_requested=count,
                                 months=[month] if month else [],
-                                strategy="month_spread" if month else "newest_first")
+                                strategy="month_spread" if month else "newest_first",
+                                parts_only=parts_only)
     finally:
         conn.close()
 
 
-def stage_multi_month_batch(month_counts, dry_run=False):
+def stage_multi_month_batch(month_counts, dry_run=False, parts_only=False):
     """Stage several months into ONE combined work order.
 
     month_counts: [(month, count)], oldest first — typically straight from
@@ -168,7 +173,7 @@ def stage_multi_month_batch(month_counts, dry_run=False):
     try:
         selected, by_month = [], {}
         for month, count in month_counts:
-            picked = _select_month(conn, count, exclude, month)
+            picked = _select_month(conn, count, exclude, month, parts_only=parts_only)
             by_month[month] = picked
             selected.extend(picked)
 
@@ -187,7 +192,7 @@ def stage_multi_month_batch(month_counts, dry_run=False):
         return _finish_and_save(conn, selected,
                                 count_requested=sum(c for _, c in month_counts),
                                 months=[m for m, _ in month_counts],
-                                strategy="month_spread_multi")
+                                strategy="month_spread_multi", parts_only=parts_only)
     finally:
         conn.close()
 
@@ -202,7 +207,7 @@ def _batch_months(batch):
     return []
 
 
-def append_months_to_batch(month_counts, dry_run=False):
+def append_months_to_batch(month_counts, dry_run=False, parts_only=False):
     """Add more months onto the currently staged (NOT YET PROCESSED) batch,
     instead of starting a fresh one. If nothing is staged (or the staged
     batch turns out to be stale/already-processed elsewhere), this falls back
@@ -223,7 +228,12 @@ def append_months_to_batch(month_counts, dry_run=False):
         existing = None
     if existing is None:
         print("No batch currently staged — staging fresh instead of appending.")
-        return stage_multi_month_batch(month_counts, dry_run=dry_run)
+        return stage_multi_month_batch(month_counts, dry_run=dry_run, parts_only=parts_only)
+
+    if bool(existing.get("parts_only")) != parts_only:
+        sys.exit(f"Staged batch {existing['batch_id']} was built with "
+                 f"parts_only={bool(existing.get('parts_only'))}; refusing to append "
+                 f"parts_only={parts_only} dispatches into the same work order.")
 
     already = _batch_months(existing)
     overlap = sorted(set(already) & {m for m, _ in month_counts})
@@ -239,7 +249,7 @@ def append_months_to_batch(month_counts, dry_run=False):
     try:
         selected, by_month = [], {}
         for month, count in month_counts:
-            picked = _select_month(conn, count, exclude, month)
+            picked = _select_month(conn, count, exclude, month, parts_only=parts_only)
             by_month[month] = picked
             selected.extend(picked)
 
@@ -322,7 +332,7 @@ def _gzip_heads_up(n_dispatches):
               f"50MB and hard-blocks above 100MB per file.")
 
 
-def _finish_and_save(conn, selected, count_requested, months, strategy):
+def _finish_and_save(conn, selected, count_requested, months, strategy, parts_only=False):
     ids = [h["dispatch_id"] for h in selected]
     notes = db.fetch_notes_for(conn, ids)
     parts = db.fetch_parts_for(conn, ids)
@@ -341,6 +351,7 @@ def _finish_and_save(conn, selected, count_requested, months, strategy):
         "count_requested": count_requested,
         "strategy": strategy,
         "months": months,
+        "parts_only": parts_only,
         "dispatches": dispatches,
     }
     save_json(config.BATCH_FILE, batch)
@@ -383,9 +394,9 @@ def _finish_and_save(conn, selected, count_requested, months, strategy):
     return batch
 
 
-def _select(conn, count, exclude):
+def _select(conn, count, exclude, parts_only=False):
     for factor in (3, 10):
-        cands = db.fetch_candidates(conn, count * factor)
+        cands = db.fetch_candidates(conn, count * factor, parts_only=parts_only)
         fresh = [h for h in cands if h["dispatch_id"] not in exclude]
         if len(fresh) >= count:
             return fresh[:count]
@@ -402,9 +413,10 @@ def _select(conn, count, exclude):
 MONTH_FETCH_CAP = 100_000
 
 
-def _select_month(conn, count, exclude, month):
+def _select_month(conn, count, exclude, month, parts_only=False):
     dt_min, dt_max = monthplan.month_bounds(month)
-    cands = db.fetch_candidates(conn, MONTH_FETCH_CAP, dt_min=dt_min, dt_max=dt_max)
+    cands = db.fetch_candidates(conn, MONTH_FETCH_CAP, dt_min=dt_min, dt_max=dt_max,
+                                parts_only=parts_only)
     fresh = [h for h in cands if h["dispatch_id"] not in exclude]
     fresh.sort(key=lambda h: (h["received_dt"] or "", h["dispatch_id"]))
     print(f"{month}: {len(cands)} eligible, {len(fresh)} unprocessed.")

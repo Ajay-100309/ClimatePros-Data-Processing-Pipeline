@@ -20,6 +20,12 @@ Two selection strategies:
                           calendar months. --plan-months builds a multi-month
                           budget once; --next-month then walks it.
 
+--parts-only restricts any of the above to dispatches with >=1 real recorded
+part (catalog number present, not a consumable, qty>0 — same definition as
+search_index.real_parts()). The check runs in SQL before the dispatch is ever
+fetched, so a non-qualifying dispatch never costs a Stage A/B LLM call — it is
+skipped at candidate-selection time, not discovered-and-wasted later.
+
 Usage:
     venv/bin/python fetch.py --count 200
     venv/bin/python fetch.py --count 5 --dry-run
@@ -29,6 +35,10 @@ Usage:
     venv/bin/python fetch.py --next-month
     venv/bin/python fetch.py --next-month 3       # combine 3 months into one work order
     venv/bin/python fetch.py --month 2025-02 --count 5000
+
+    venv/bin/python fetch.py --count 10000 --parts-only   # fastest path: newest
+                                                           # parts-bearing dispatches,
+                                                           # no month constraint
 """
 import re
 import sys
@@ -102,6 +112,11 @@ def main():
                          "calendar month covered twice)")
     ap.add_argument("--end-month", metavar="YYYY-MM", default="2026-06",
                     help="planning: newest month in the window (default 2026-06)")
+    ap.add_argument("--parts-only", action="store_true",
+                    help="only stage dispatches with >=1 real recorded part "
+                         "(catalog number, not a consumable, qty>0) — filtered "
+                         "in SQL before fetching, so no LLM spend is wasted on "
+                         "a dispatch that could never contribute parts evidence")
     args = ap.parse_args()
 
     if args.show_plan:
@@ -134,7 +149,8 @@ def main():
         print(f"Appending {len(month_counts)} month(s): "
               + ", ".join(f"{m} ({c:,})" for m, c in month_counts)
               + f" — {total:,} more dispatches")
-        batch = runner.append_months(month_counts, dry_run=args.dry_run)
+        batch = runner.append_months(month_counts, dry_run=args.dry_run,
+                                     parts_only=args.parts_only)
         if batch is None:
             return  # dry run; stage_fetch already printed the report
         print(f"Work order: {config.BATCH_FILE}")
@@ -171,7 +187,8 @@ def main():
             print(f"Next {len(month_counts)} month(s) from plan: "
                   + ", ".join(f"{m} ({c:,})" for m, c in month_counts)
                   + f" — {total:,} dispatches combined into one work order")
-            batch = runner.fetch_months(month_counts, dry_run=args.dry_run)
+            batch = runner.fetch_months(month_counts, dry_run=args.dry_run,
+                                        parts_only=args.parts_only)
             if batch is None:
                 return  # dry run; stage_fetch already printed the report
             print(f"Work order: {config.BATCH_FILE}")
@@ -183,7 +200,8 @@ def main():
     if not count:
         sys.exit("--count N is required (or --next-month, which reads the plan).")
 
-    batch = runner.fetch(count, dry_run=args.dry_run, month=month)
+    batch = runner.fetch(count, dry_run=args.dry_run, month=month,
+                         parts_only=args.parts_only)
     if batch is None:
         return  # dry run; stage_fetch already printed the report
 

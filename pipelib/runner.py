@@ -65,11 +65,14 @@ def stats():
               f"({len(staged['dispatches'])} dispatches)")
 
 
-def fetch(count, dry_run=False, month=None):
+def fetch(count, dry_run=False, month=None, parts_only=False):
     """Stage the next `count` never-processed dispatches as the work order.
 
     With `month="YYYY-MM"`, selects from that month and spreads the picks
-    evenly across it instead of taking the newest.
+    evenly across it instead of taking the newest. With `parts_only=True`,
+    restricts to dispatches with >=1 real recorded part (db.PARTS_EXISTS_SQL)
+    — applied in SQL before the TOP(count) limit, so this never wastes Stage
+    A/B LLM spend on a dispatch that could never contribute parts evidence.
 
     Returns the staged batch, or None for a dry run. Nothing is marked
     processed here — a staged batch that is never processed only leaves its
@@ -77,10 +80,10 @@ def fetch(count, dry_run=False, month=None):
     """
     statefiles.ensure_dirs()
     check_state()
-    return stage_fetch.stage_batch(count, dry_run=dry_run, month=month)
+    return stage_fetch.stage_batch(count, dry_run=dry_run, month=month, parts_only=parts_only)
 
 
-def fetch_months(month_counts, dry_run=False):
+def fetch_months(month_counts, dry_run=False, parts_only=False):
     """Stage several months (oldest first) into ONE combined work order, so a
     single process.py run churns through all of them without a git round trip
     after each month. month_counts: [(month, count)], typically straight from
@@ -88,17 +91,19 @@ def fetch_months(month_counts, dry_run=False):
     """
     statefiles.ensure_dirs()
     check_state()
-    return stage_fetch.stage_multi_month_batch(month_counts, dry_run=dry_run)
+    return stage_fetch.stage_multi_month_batch(month_counts, dry_run=dry_run,
+                                               parts_only=parts_only)
 
 
-def append_months(month_counts, dry_run=False):
+def append_months(month_counts, dry_run=False, parts_only=False):
     """Add more months onto the currently staged, not-yet-processed batch
     instead of starting a fresh one. Only safe before that batch has been
     handed to a processing machine — see stage_fetch.append_months_to_batch.
     """
     statefiles.ensure_dirs()
     check_state()
-    return stage_fetch.append_months_to_batch(month_counts, dry_run=dry_run)
+    return stage_fetch.append_months_to_batch(month_counts, dry_run=dry_run,
+                                              parts_only=parts_only)
 
 
 def _slices(dispatches, size):

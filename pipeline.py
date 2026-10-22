@@ -45,6 +45,9 @@ def main():
                          "case reports (legacy default)")
     ap.add_argument("--chunk-size", type=int, default=None, metavar="N",
                     help="dispatches per A->B->D slice (default 500 from config.PROCESS_CHUNK); the search index is updated after each slice. 0 runs each stage over the whole batch")
+    ap.add_argument("--parts-only", action="store_true",
+                    help="only fetch dispatches with >=1 real recorded part "
+                         "(filtered in SQL — see fetch.py --parts-only)")
     args = ap.parse_args()
 
     if args.stats:
@@ -60,7 +63,8 @@ def main():
     else:
         if not args.count:
             sys.exit("--count N is required (or --skip-fetch / --stats).")
-        batch = runner.fetch(args.count, dry_run=args.dry_run, month=args.month)
+        batch = runner.fetch(args.count, dry_run=args.dry_run, month=args.month,
+                             parts_only=args.parts_only)
         if args.dry_run:
             return
 

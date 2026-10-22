@@ -29,7 +29,26 @@ WHERE d.IsConstruction = 0
   AND EXISTS (SELECT 1 FROM dbo.DispatchNotes dn
               WHERE dn.DispatchId = d.DispatchId
                 AND LEN(dn.DispatchNotes) > %(min_note)s)
+  {parts_filter}
 ORDER BY d.ReceivedDateTime DESC;
+"""
+
+# Mirrors search_index.real_parts() exactly: catalog number present, not a
+# consumable, summed quantity positive, inventory item resolved (the inner
+# joins enforce that last part). Injected into CAND_SQL/MONTH_COUNT_SQL when
+# parts_only is requested, so Stage A/B LLM spend is never wasted fetching a
+# dispatch that could never contribute parts evidence to the index.
+PARTS_EXISTS_SQL = """
+  AND EXISTS (
+    SELECT 1 FROM dbo.DispatchParts dp
+    JOIN dbo.InventoryLocationXREF xr ON xr.InventoryLocationXREFId = dp.InventoryLocationXREFId
+    JOIN dbo.Inventory inv ON inv.InventoryId = xr.InventoryId
+    WHERE dp.DispatchId = d.DispatchId
+      AND inv.NonPart = 0
+      AND LTRIM(RTRIM(ISNULL(inv.Number, ''))) <> ''
+    GROUP BY dp.DispatchId, xr.InventoryId
+    HAVING SUM(dp.Quantity) > 0
+  )
 """
 
 
@@ -46,6 +65,7 @@ WHERE d.IsConstruction = 0
   AND EXISTS (SELECT 1 FROM dbo.DispatchNotes dn
               WHERE dn.DispatchId = d.DispatchId
                 AND LEN(dn.DispatchNotes) > %(min_note)s)
+  {parts_filter}
 GROUP BY FORMAT(d.ReceivedDateTime, 'yyyy-MM')
 ORDER BY ym DESC;
 """
@@ -92,15 +112,19 @@ def connect():
     )
 
 
-def fetch_candidates(conn, n, dt_min=None, dt_max=None):
+def fetch_candidates(conn, n, dt_min=None, dt_max=None, parts_only=False):
     """Newest-first candidate dispatch headers. Returns list of dicts with
     UPPERCASE GUID strings.
 
     dt_min/dt_max default to the config-wide window; month-stratified fetching
     passes one month's bounds instead (the SQL already parameterizes both).
+    parts_only restricts to dispatches with >=1 real recorded part (see
+    PARTS_EXISTS_SQL) — the TOP(n) is applied after that filter, so this
+    returns n already-qualifying dispatches, not n raw ones to filter later.
     """
     cur = conn.cursor(as_dict=True)
-    cur.execute(CAND_SQL, {
+    sql = CAND_SQL.format(parts_filter=PARTS_EXISTS_SQL if parts_only else "")
+    cur.execute(sql, {
         "n": n,
         "dt_min": dt_min or config.RECEIVED_MIN,
         "dt_max": dt_max or config.RECEIVED_CUTOFF,
@@ -118,14 +142,15 @@ def fetch_candidates(conn, n, dt_min=None, dt_max=None):
     return out
 
 
-def count_candidates_by_month(conn, dt_min, dt_max):
+def count_candidates_by_month(conn, dt_min, dt_max, parts_only=False):
     """{'YYYY-MM': eligible_count} over the window, same filters as CAND_SQL.
 
     One grouped scan; measured ~5s per month of range, so keep the window to
     what the plan actually needs rather than all of 2013-2026.
     """
     cur = conn.cursor(as_dict=True)
-    cur.execute(MONTH_COUNT_SQL, {
+    sql = MONTH_COUNT_SQL.format(parts_filter=PARTS_EXISTS_SQL if parts_only else "")
+    cur.execute(sql, {
         "dt_min": dt_min, "dt_max": dt_max, "min_note": config.MIN_NOTE_LEN})
     return {r["ym"]: int(r["n"]) for r in cur.fetchall()}
 
