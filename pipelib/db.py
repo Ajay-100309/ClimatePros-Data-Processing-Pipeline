@@ -38,13 +38,21 @@ ORDER BY d.ReceivedDateTime DESC;
 # joins enforce that last part). Injected into CAND_SQL/MONTH_COUNT_SQL when
 # parts_only is requested, so Stage A/B LLM spend is never wasted fetching a
 # dispatch that could never contribute parts evidence to the index.
+#
+# Non-correlated (`d.DispatchId IN (...)`, not `WHERE dp.DispatchId = d.DispatchId`)
+# on purpose: a correlated EXISTS forces SQL Server to re-run the 3-way join
+# per candidate row, and at ~17% match rate a TOP(n) scan has to evaluate it
+# for ~6x as many dispatches as it returns — measured timing out past 60s
+# once n reached the tens of thousands. The IN-subquery lets the optimizer
+# materialize the qualifying DispatchId set once (hash semi-join); measured
+# 200,000 rows in 37s against the same timeout where EXISTS never returned.
 PARTS_EXISTS_SQL = """
-  AND EXISTS (
-    SELECT 1 FROM dbo.DispatchParts dp
+  AND d.DispatchId IN (
+    SELECT dp.DispatchId
+    FROM dbo.DispatchParts dp
     JOIN dbo.InventoryLocationXREF xr ON xr.InventoryLocationXREFId = dp.InventoryLocationXREFId
     JOIN dbo.Inventory inv ON inv.InventoryId = xr.InventoryId
-    WHERE dp.DispatchId = d.DispatchId
-      AND inv.NonPart = 0
+    WHERE inv.NonPart = 0
       AND LTRIM(RTRIM(ISNULL(inv.Number, ''))) <> ''
     GROUP BY dp.DispatchId, xr.InventoryId
     HAVING SUM(dp.Quantity) > 0
@@ -108,7 +116,7 @@ def connect():
     return pymssql.connect(
         server=config.DB["server"], port=config.DB["port"],
         database=config.DB["database"], user=config.DB["user"],
-        password=config.DB["password"], timeout=60, login_timeout=30,
+        password=config.DB["password"], timeout=120, login_timeout=30,
     )
 
 
