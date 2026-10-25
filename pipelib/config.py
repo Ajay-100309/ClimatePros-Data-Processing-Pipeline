@@ -66,7 +66,7 @@ def require_search_config():
 N_CANDIDATES = 5
 SIM_FLOOR = 0.60
 NOTE_CHUNK = 20
-MAX_WORKERS = 8
+MAX_WORKERS = 1
 CHECKPOINT_EVERY = 10
 # Dispatches per A->B->D pass. The batch is processed in slices so documents
 # reach the search index throughout a long run instead of only at the end;
