@@ -172,6 +172,7 @@ def process(batch, with_cases=False, chunk_size=None):
             # keep the popularity prior coherent with the index mid-run, so a
             # killed run leaves the two consistent rather than skewed
             stage_index.write_popularity(index_state)
+            stage_index.compact_pushed_parts(index_state)
             print(f"--- Slice {i}/{len(chunks)} complete: {done}/{total} dispatches "
                   f"through the pipeline; index holds "
                   f"{len(index_state['pushed'])} documents. ---")
@@ -228,6 +229,7 @@ def finalize(batch, notes_state, extract_state, index_state, casemap_state=None)
     if casemap_state is not None:
         reports.write_all(casemap_state)
     stage_index.write_popularity(index_state)
+    stage_index.compact_pushed_parts(index_state)
 
     archive = dict(batch)
     archive["outcomes"] = outcomes

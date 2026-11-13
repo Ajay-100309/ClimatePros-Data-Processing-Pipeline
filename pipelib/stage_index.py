@@ -101,6 +101,29 @@ def run(batch, extract_state, useful):
     return index_items(items, EmbCache(), state)
 
 
+def compact_pushed_parts(index_state=None):
+    """Shrink parts.json entries for already-pushed dispatches down to their
+    real-parts subset — the same filter build_document()/write_popularity()
+    already apply, so every reader stays correct. Consumables and unresolved
+    line items are the bulk of a raw entry's size; dropping them for dispatches
+    that are done is what keeps parts.json from growing without bound as the
+    parts-only backlog is cleared."""
+    pushed = (index_state or load_state())["pushed"]
+    parts_state = load_json(config.PARTS_FILE, {"schema": 1, "dispatches": {}})
+    changed = 0
+    for did in pushed:
+        entry = parts_state["dispatches"].get(did)
+        if entry is None:
+            continue
+        real = search_index.real_parts(entry["items"])
+        if len(real) != len(entry["items"]):
+            entry["items"] = real
+            changed += 1
+    if changed:
+        save_json(config.PARTS_FILE, parts_state)
+        print(f"Compacted {changed} parts.json entries to real-parts-only.")
+
+
 def write_popularity(state):
     """output/part_popularity.json: distinct-dispatch count per real partNo
     across everything pushed — the same popularity definition the blended

@@ -119,6 +119,7 @@ def main():
     cache = EmbCache()
     state = stage_index.index_items(items, cache, state, force=args.force_push)
     stage_index.write_popularity(state)
+    stage_index.compact_pushed_parts(state)
     print(f"\nDone. {len(state['pushed'])} dispatches recorded as pushed to "
           f"index '{state['index']}'.")
 
