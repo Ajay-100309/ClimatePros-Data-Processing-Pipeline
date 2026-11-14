@@ -2,8 +2,11 @@
 
 - 60 RPM chat limit: RateLimitError -> sleep 60 -> retry, indefinitely.
 - Repetition-loop hang at temperature=0 (observed once, reproducible on that
-  input): client timeout 120s; on APITimeoutError retry ONCE with
-  temperature=0.4 and a max_tokens cap, then raise.
+  input): on APITimeoutError retry ONCE with temperature=0.4 and a max_tokens
+  cap, then raise. Client timeout raised 120s -> 300s on 2026-11-14: a routine
+  20-note Stage A chunk measured 102.9s on the model in use then, leaving too
+  little margin at 120s and causing every retry (including the temp=0.4 one)
+  to time out identically.
 - Embedding responses sorted by .index before use (order not guaranteed).
 """
 import json
@@ -15,7 +18,7 @@ from openai import OpenAI, RateLimitError, APITimeoutError, APIConnectionError
 from . import config
 
 _client = OpenAI(api_key=config.API_KEY, base_url=config.BASE_URL,
-                 timeout=120, max_retries=1)
+                 timeout=300, max_retries=1)
 
 # Tailscale DNS on the gateway host blips occasionally ("Temporary failure in
 # name resolution") — retry with backoff instead of failing the work item.
